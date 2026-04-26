@@ -1,0 +1,2126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThreadOS — Master Threads & Concurrency</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@300;400;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+/* ============================================================ VARIABLES */
+:root {
+  --bg:#030308;--bg2:#07070f;--bg3:#0d0d1a;--surface:#111122;--surface2:#181832;
+  --border:#1e1e38;--border2:rgba(0,240,255,0.12);--accent:#00f0ff;--accent2:#8b5cf6;
+  --accent3:#f59e0b;--accent4:#10d98c;--danger:#ff4757;
+  --text:#eeeef8;--text2:#8888aa;--text3:#3a3a5c;
+  --glow:0 0 30px rgba(0,240,255,0.3);--glow2:0 0 20px rgba(139,92,246,0.3);
+  --radius:14px;--transition:all 0.35s cubic-bezier(0.23,1,0.32,1);
+}
+/* ============================================================ RESET */
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;overflow-x:hidden;line-height:1.7;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:linear-gradient(var(--accent2),var(--accent));border-radius:2px;}
+
+/* ============================================================ NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 2.5rem;height:68px;
+  background:rgba(3,3,8,0.88);backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{display:flex;align-items:center;gap:0.75rem;text-decoration:none;}
+.nav-logo-icon{
+  width:38px;height:38px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;box-shadow:var(--glow);
+}
+.nav-logo-text{font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:var(--accent);letter-spacing:0.05em;}
+.nav-logo-text span{color:var(--accent2);}
+.nav-links{display:flex;gap:0.2rem;list-style:none;background:var(--surface);padding:0.3rem;border-radius:12px;border:1px solid var(--border);}
+.nav-links a{
+  color:var(--text2);text-decoration:none;font-size:0.75rem;font-weight:600;
+  letter-spacing:0.04em;text-transform:uppercase;padding:0.4rem 0.85rem;
+  border-radius:8px;transition:var(--transition);font-family:'JetBrains Mono',monospace;
+}
+.nav-links a:hover,.nav-links a.active{color:var(--accent);background:rgba(0,240,255,0.1);}
+.nav-progress{position:fixed;top:68px;left:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent3));width:0%;transition:width 0.1s;z-index:999;}
+
+/* ============================================================ HERO */
+#home{
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;padding-top:68px;
+}
+.hero-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse 70% 60% at 50% 40%,rgba(139,92,246,0.13) 0%,transparent 70%),
+    radial-gradient(ellipse 40% 40% at 15% 80%,rgba(0,240,255,0.09) 0%,transparent 60%),
+    radial-gradient(ellipse 30% 30% at 85% 20%,rgba(245,158,11,0.06) 0%,transparent 60%);
+}
+.hero-grid{
+  position:absolute;inset:0;
+  background-image:linear-gradient(rgba(30,30,56,0.35) 1px,transparent 1px),linear-gradient(90deg,rgba(30,30,56,0.35) 1px,transparent 1px);
+  background-size:64px 64px;
+  mask-image:radial-gradient(ellipse 85% 85% at 50% 50%,black,transparent);
+  animation:gridScroll 25s linear infinite;
+}
+@keyframes gridScroll{0%{background-position:0 0,0 0;}100%{background-position:0 64px,64px 0;}}
+.particle{position:absolute;width:2px;border-radius:1px;animation:floatUp linear infinite;opacity:0;}
+@keyframes floatUp{0%{transform:translateY(100vh);opacity:0;}10%{opacity:0.5;}90%{opacity:0.5;}100%{transform:translateY(-80px);opacity:0;}}
+.hero-content{position:relative;z-index:2;text-align:center;max-width:920px;padding:0 2rem;}
+.hero-tag{
+  display:inline-flex;align-items:center;gap:0.5rem;
+  font-family:'JetBrains Mono',monospace;font-size:0.68rem;letter-spacing:0.18em;text-transform:uppercase;
+  color:var(--accent);background:rgba(0,240,255,0.07);border:1px solid rgba(0,240,255,0.2);
+  padding:0.4rem 1.2rem;border-radius:100px;margin-bottom:2.2rem;
+  animation:fadeUp 0.8s ease both;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+.hero-title{font-size:clamp(3rem,8vw,7rem);font-weight:900;line-height:0.92;letter-spacing:-0.04em;margin-bottom:1.5rem;animation:fadeUp 0.8s 0.1s ease both;}
+.hero-title .l1{display:block;color:var(--text);}
+.hero-title .l2{display:block;background:linear-gradient(135deg,var(--accent),var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-sub{font-size:1.05rem;color:var(--text2);max-width:600px;margin:0 auto 2.5rem;line-height:1.75;animation:fadeUp 0.8s 0.2s ease both;}
+.hero-ctas{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;animation:fadeUp 0.8s 0.3s ease both;}
+.btn-primary{
+  padding:0.85rem 2rem;background:var(--accent);color:#000;font-weight:700;font-size:0.88rem;
+  border:none;border-radius:10px;cursor:pointer;letter-spacing:0.04em;text-transform:uppercase;
+  text-decoration:none;transition:var(--transition);box-shadow:0 0 24px rgba(0,240,255,0.35);
+  font-family:'JetBrains Mono',monospace;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 40px rgba(0,240,255,0.55);}
+.btn-secondary{
+  padding:0.85rem 2rem;background:transparent;color:var(--text);font-weight:600;font-size:0.88rem;
+  border:1px solid var(--border2);border-radius:10px;cursor:pointer;letter-spacing:0.04em;text-transform:uppercase;
+  text-decoration:none;transition:var(--transition);font-family:'JetBrains Mono',monospace;
+}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.hero-stats{display:flex;gap:3rem;justify-content:center;margin-top:4.5rem;animation:fadeUp 0.8s 0.4s ease both;flex-wrap:wrap;}
+.stat{text-align:center;}
+.stat-num{display:block;font-family:'JetBrains Mono',monospace;font-size:2.2rem;font-weight:700;color:var(--accent);line-height:1;}
+.stat-label{font-size:0.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.12em;margin-top:0.3rem;display:block;}
+
+/* ============================================================ LAYOUT */
+.page-wrap{max-width:1300px;margin:0 auto;padding:0 2rem;}
+section{padding:6rem 0;scroll-margin-top:68px;}
+.section-header{text-align:center;margin-bottom:4rem;}
+.section-tag{font-family:'JetBrains Mono',monospace;font-size:0.68rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent2);display:block;margin-bottom:0.9rem;}
+.section-title{font-size:clamp(2rem,4vw,3.2rem);font-weight:900;letter-spacing:-0.03em;line-height:1.05;margin-bottom:0.9rem;}
+.section-sub{color:var(--text2);font-size:0.98rem;max-width:620px;margin:0 auto;line-height:1.75;}
+.divider{width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:0;}
+
+/* ============================================================ CARDS */
+.grid-4{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.25rem;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:1.75rem;position:relative;overflow:hidden;transition:var(--transition);
+}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));transform:scaleX(0);transition:transform 0.3s;transform-origin:left;}
+.card:hover{border-color:rgba(0,240,255,0.2);transform:translateY(-4px);box-shadow:0 20px 50px rgba(0,0,0,0.4);}
+.card:hover::before{transform:scaleX(1);}
+.card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;margin-bottom:1rem;}
+.card-title{font-size:1rem;font-weight:700;margin-bottom:0.5rem;color:var(--text);}
+.card-text{font-size:0.85rem;color:var(--text2);line-height:1.65;}
+
+/* ============================================================ BAND */
+.band{background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:5rem 0;margin:0;}
+.band .page-wrap{max-width:1300px;margin:0 auto;padding:0 2rem;}
+
+/* ============================================================ DIAGRAMS */
+.viz-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:2rem;margin-bottom:2rem;overflow:hidden;}
+.viz-label{text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.15em;color:var(--text3);margin-bottom:2rem;}
+.cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+.proc-box{border:1px solid var(--border);border-radius:10px;padding:1.5rem;}
+.proc-title{font-family:'JetBrains Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text2);margin-bottom:1.25rem;display:flex;align-items:center;gap:0.5rem;}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.4rem;margin-bottom:0.4rem;}
+.res-box{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:0.5rem;text-align:center;font-size:0.68rem;font-family:'JetBrains Mono',monospace;color:var(--text2);}
+.res-box.hi{border-color:rgba(0,240,255,0.3);color:var(--accent);background:rgba(0,240,255,0.05);}
+.wave-wrap{display:flex;justify-content:center;gap:1rem;margin-top:1.25rem;}
+.thread-wave{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.ws{width:3px;height:7px;border-radius:2px;animation:wavePulse 1.6s ease-in-out infinite;}
+.ws:nth-child(2){transform:translateX(4px);}
+.ws:nth-child(3){transform:translateX(-4px);}
+.ws:nth-child(4){transform:translateX(4px);}
+.ws:nth-child(5){transform:translateX(-4px);}
+.ws:nth-child(6){transform:translateX(4px);}
+.ws:nth-child(7){transform:translateX(-4px);}
+@keyframes wavePulse{0%,100%{opacity:0.2;}50%{opacity:1;}}
+.wlabel{font-size:0.62rem;font-family:'JetBrains Mono',monospace;color:var(--text3);margin-top:0.4rem;text-align:center;}
+
+/* ============================================================ TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:0.87rem;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);}
+.tbl th{background:var(--surface2);padding:0.9rem 1.25rem;text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text2);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);}
+.tbl td{padding:0.85rem 1.25rem;border-bottom:1px solid rgba(30,30,56,0.6);color:var(--text2);line-height:1.5;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:rgba(0,240,255,0.02);}
+.td-yes{color:var(--accent4);font-weight:700;}
+.td-no{color:var(--danger);font-weight:700;}
+.td-feat{color:var(--text);font-weight:600;}
+
+/* ============================================================ MODELS */
+.models-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:1.5rem;}
+.model-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:var(--transition);}
+.model-card:hover{transform:translateY(-4px);border-color:rgba(139,92,246,0.35);box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+.mc-head{padding:1.25rem 1.5rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.9rem;}
+.mc-badge{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+.mc-name{font-size:1rem;font-weight:700;}
+.mc-sub{font-size:0.78rem;color:var(--text2);}
+.mc-diag{padding:1.25rem;}
+.mc-body{padding:0 1.5rem 1.5rem;}
+.mc-pros-cons{display:grid;grid-template-columns:1fr 1fr;gap:0.7rem;margin-top:0.9rem;}
+.pros,.cons{background:var(--bg3);border-radius:8px;padding:0.7rem;}
+.pros-t{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent4);margin-bottom:0.4rem;font-family:'JetBrains Mono',monospace;}
+.cons-t{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--danger);margin-bottom:0.4rem;font-family:'JetBrains Mono',monospace;}
+.pros li,.cons li{font-size:0.76rem;color:var(--text2);list-style:none;padding:0.15rem 0 0.15rem 0.9rem;position:relative;}
+.pros li::before{content:'+';position:absolute;left:0;color:var(--accent4);font-weight:700;}
+.cons li::before{content:'−';position:absolute;left:0;color:var(--danger);font-weight:700;}
+.ex-row{margin-top:0.9rem;}
+.ex-label{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text2);font-family:'JetBrains Mono',monospace;margin-bottom:0.4rem;}
+.ex-tags{display:flex;flex-wrap:wrap;gap:0.35rem;}
+.ex-tag{font-family:'JetBrains Mono',monospace;font-size:0.67rem;padding:0.2rem 0.55rem;border-radius:5px;background:var(--bg3);border:1px solid var(--border);color:var(--accent3);}
+
+/* ============================================================ THREAD TYPES */
+.types-pair{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:2rem;}
+.type-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;position:relative;overflow:hidden;}
+.type-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;}
+.user-t::after{background:var(--accent);}
+.kernel-t::after{background:var(--accent2);}
+.type-title{font-size:1rem;font-weight:700;margin-bottom:0.7rem;display:flex;align-items:center;gap:0.5rem;}
+.type-desc{font-size:0.83rem;color:var(--text2);line-height:1.65;margin-bottom:0.9rem;}
+.type-list{list-style:none;}
+.type-list li{font-size:0.78rem;color:var(--text2);padding:0.28rem 0 0.28rem 1.1rem;position:relative;}
+.user-t .type-list li::before{content:'→';position:absolute;left:0;color:var(--accent);font-size:0.7rem;}
+.kernel-t .type-list li::before{content:'→';position:absolute;left:0;color:var(--accent2);font-size:0.7rem;}
+/*  */
+h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 2rem 0 0.75rem;
+}
+
+h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--accent);
+}
+
+p {
+  color: var(--text2);
+  line-height: 1.8;
+  margin-bottom: 1.25rem;
+}
+
+.highlight-box {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 10px;
+  margin: 1.25rem 0;
+}
+
+.hb-info {
+  background: rgba(0,240,255,0.06);
+  border: 1px solid rgba(0,240,255,0.15);
+}
+
+.hb-icon {
+  font-size: 1.3rem;
+}
+
+.hb-content strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+.ad-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.ad-box {
+  background: var(--bg3);
+  border-radius: 12px;
+  padding: 1.2rem;
+  border: 1px solid var(--border);
+}
+
+.ad-box-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+.pros .ad-box-title {
+  color: var(--accent4);
+}
+
+.cons .ad-box-title {
+  color: var(--danger);
+}
+
+.ad-list {
+  list-style: none;
+}
+
+.ad-list li {
+  padding: 0.3rem 0 0.3rem 1.2rem;
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+
+.ad-list li:last-child {
+  border-bottom: none;
+}
+
+.pros .ad-list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--accent4);
+}
+
+.cons .ad-list li::before {
+  content: '✗';
+  position: absolute;
+  left: 0;
+  color: var(--danger);
+}
+.mm-wrap svg line {
+  filter: drop-shadow(0 0 4px rgba(0,0,0,0.25));
+}
+
+@media (prefers-color-scheme: dark) {
+  .mm-wrap svg line {
+    filter: drop-shadow(0 0 6px currentColor);
+  }
+}
+.node ellipse,
+.node rect {
+  transition: all 0.25s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  .node ellipse {
+    stroke-width: 2.2;
+    filter: drop-shadow(0 0 10px rgba(255,255,255,0.08));
+  }
+
+  .node rect {
+    stroke-width: 1.4;
+  }
+}
+.node:hover ellipse,
+.node:hover rect {
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 12px currentColor);
+  cursor: pointer;
+}
+
+.node:hover text {
+  fill: #ffffff;
+}
+.mm-wrap svg line {
+  stroke-dasharray: 6 6;
+  animation: flow 12s linear infinite;
+}
+
+@keyframes flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 1000; }
+}
+/* ============================================================ ADVANTAGES */
+.adv-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+.adv-item{padding:1.5rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);display:flex;gap:1rem;align-items:flex-start;transition:var(--transition);}
+.adv-item:hover{border-color:rgba(0,240,255,0.2);}
+.adv-n{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;color:rgba(0,240,255,0.15);flex-shrink:0;line-height:1;}
+.adv-c h4{font-size:0.95rem;font-weight:700;margin-bottom:0.35rem;color:var(--text);}
+.adv-c p{font-size:0.83rem;color:var(--text2);line-height:1.65;margin:0;}
+
+/* ============================================================ SYNCHRONIZATION & DEADLOCK */
+.sync-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;margin:1.5rem 0;}
+.sync-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;position:relative;overflow:hidden;transition:var(--transition);}
+.sync-card:hover{transform:translateY(-3px);box-shadow:0 15px 40px rgba(0,0,0,0.35);}
+.sync-icon{font-size:2rem;margin-bottom:0.75rem;}
+.sync-title{font-size:0.95rem;font-weight:700;margin-bottom:0.5rem;color:var(--text);}
+.sync-text{font-size:0.83rem;color:var(--text2);line-height:1.65;}
+.deadlock-conditions{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin:1.5rem 0;}
+.dl-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1.25rem;border-left:3px solid var(--danger);}
+.dl-num{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--danger);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.4rem;}
+.dl-name{font-size:0.9rem;font-weight:700;margin-bottom:0.4rem;}
+.dl-desc{font-size:0.8rem;color:var(--text2);line-height:1.6;}
+
+/* ============================================================ CODE BLOCKS */
+.code-block{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin:1.5rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 1rem;border-bottom:1px solid var(--border);background:var(--bg2);}
+.code-lang{font-family:'JetBrains Mono',monospace;font-size:0.67rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:8px;height:8px;border-radius:50%;}
+pre{padding:1.25rem;font-family:'JetBrains Mono',monospace;font-size:0.8rem;line-height:1.85;overflow-x:auto;color:var(--accent4);}
+.kw{color:var(--accent2);}.cm{color:var(--text3);}.str{color:var(--accent3);}.fn{color:var(--accent);}
+
+/* ============================================================ INFO BOX */
+.info-box{display:flex;gap:0.9rem;align-items:flex-start;padding:1rem 1.25rem;border-radius:10px;margin:1.25rem 0;}
+.ib-info{background:rgba(0,240,255,0.05);border:1px solid rgba(0,240,255,0.15);}
+.ib-warn{background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.18);}
+.ib-danger{background:rgba(255,71,87,0.05);border:1px solid rgba(255,71,87,0.18);}
+.ib-success{background:rgba(16,217,140,0.05);border:1px solid rgba(16,217,140,0.18);}
+.ib-icon{font-size:1.1rem;flex-shrink:0;margin-top:2px;}
+.ib-body{font-size:0.86rem;color:var(--text2);line-height:1.65;}
+.ib-body strong{color:var(--text);}
+.ch-header{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);}
+.ch-badge{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;}
+.ch-num{font-family:'JetBrains Mono',monospace;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--text3);margin-bottom:0.2rem;}
+.ch-title{font-size:1.5rem;font-weight:800;letter-spacing:-0.02em;}
+p.body{color:var(--text2);line-height:1.8;margin-bottom:1.1rem;font-size:0.93rem;}
+p.body strong{color:var(--text);}
+h3.sub{font-size:1.1rem;font-weight:700;margin:1.75rem 0 0.7rem;color:var(--text);}
+h4.subsub{font-size:0.95rem;font-weight:700;margin:1.25rem 0 0.5rem;color:var(--accent);}
+
+/* ============================================================ BADGES */
+.badge{display:inline-block;padding:0.15rem 0.55rem;border-radius:5px;font-size:0.67rem;font-family:'JetBrains Mono',monospace;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;}
+.badge-cyan{background:rgba(0,240,255,0.1);color:var(--accent);border:1px solid rgba(0,240,255,0.2);}
+.badge-purple{background:rgba(139,92,246,0.1);color:var(--accent2);border:1px solid rgba(139,92,246,0.2);}
+.badge-amber{background:rgba(245,158,11,0.1);color:var(--accent3);border:1px solid rgba(245,158,11,0.2);}
+.badge-green{background:rgba(16,217,140,0.1);color:var(--accent4);border:1px solid rgba(16,217,140,0.2);}
+.badge-red{background:rgba(255,71,87,0.1);color:var(--danger);border:1px solid rgba(255,71,87,0.2);}
+
+/* ============================================================ MINDMAP */
+.mm-wrap{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:2rem;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+/* ============================================================ SIMULATOR */
+.sim-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:2rem;}
+.sim-toolbar{padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;background:var(--bg2);}
+.sim-title{font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--accent);font-weight:700;flex:1;min-width:180px;}
+.sim-controls{display:flex;gap:0.4rem;flex-wrap:wrap;}
+.sbtn{
+  padding:0.42rem 0.9rem;border-radius:7px;border:1px solid var(--border);background:var(--surface2);
+  color:var(--text);font-size:0.74rem;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:var(--transition);
+}
+.sbtn:hover{border-color:var(--accent);color:var(--accent);}
+.sbtn.active{background:var(--accent);color:#000;border-color:var(--accent);}
+.sbtn.success{border-color:var(--accent4);color:var(--accent4);}
+.sbtn.success:hover{background:var(--accent4);color:#000;}
+.sbtn.danger{border-color:var(--danger);color:var(--danger);}
+.sbtn.danger:hover{background:var(--danger);color:#000;}
+.sbtn.purple{border-color:var(--accent2);color:var(--accent2);}
+.sbtn.purple:hover{background:var(--accent2);color:#fff;}
+.sim-body{padding:1.5rem;}
+.sim-desc{font-size:0.83rem;color:var(--text2);line-height:1.65;margin-bottom:1.5rem;padding:0.9rem 1.1rem;background:var(--bg3);border-radius:9px;border-left:3px solid var(--accent);}
+
+/* Stats row */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.75rem;margin-bottom:1.5rem;}
+.stat-box{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:0.7rem;text-align:center;}
+.stat-box-label{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text2);font-family:'JetBrains Mono',monospace;margin-bottom:0.25rem;}
+.stat-box-val{font-size:1.05rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent);}
+
+/* Gantt */
+.gantt-row{display:flex;align-items:center;margin-bottom:7px;gap:8px;}
+.gantt-label{width:84px;font-size:0.68rem;font-family:'JetBrains Mono',monospace;color:var(--text2);text-align:right;flex-shrink:0;}
+.gantt-track{flex:1;height:26px;background:var(--bg3);border-radius:5px;position:relative;overflow:hidden;border:1px solid var(--border);}
+.gantt-block{position:absolute;top:0;bottom:0;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:0.57rem;font-family:'JetBrains Mono',monospace;font-weight:600;letter-spacing:0.05em;transition:all 0.4s ease;white-space:nowrap;padding:0 3px;}
+.gantt-now{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);transition:left 0.4s linear;z-index:2;box-shadow:0 0 6px var(--accent);}
+
+/* Legend */
+.legend{display:flex;gap:1.25rem;margin-top:1.25rem;flex-wrap:wrap;padding-top:1rem;border-top:1px solid var(--border);}
+.legend-item{display:flex;align-items:center;gap:0.45rem;font-size:0.74rem;color:var(--text2);}
+.legend-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0;}
+
+/* State machine */
+.sm-log{background:rgba(0,0,0,0.4);border-top:1px solid var(--border);padding:0.75rem 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.78rem;color:var(--text2);min-height:40px;}
+
+/* Blocking sim */
+.block-col{display:flex;flex-direction:column;gap:0.5rem;}
+.thread-row-item{display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.9rem;background:var(--bg3);border-radius:8px;border:1px solid var(--border);}
+
+/* ============================================================ QUIZ */
+.quiz-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:2.5rem;max-width:820px;margin:0 auto;}
+.quiz-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;}
+.quiz-prog-label{font-size:0.78rem;color:var(--text2);font-family:'JetBrains Mono',monospace;}
+.quiz-score-lbl{font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--accent3);}
+.quiz-bar{height:4px;background:var(--bg3);border-radius:2px;margin-bottom:2rem;overflow:hidden;}
+.quiz-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width 0.4s ease;}
+.quiz-q{font-size:1.15rem;font-weight:700;margin-bottom:1.75rem;line-height:1.5;}
+.quiz-opts{display:flex;flex-direction:column;gap:0.7rem;}
+.quiz-opt{
+  padding:0.9rem 1.4rem;border:1px solid var(--border);border-radius:10px;
+  background:var(--bg3);cursor:pointer;transition:var(--transition);
+  font-size:0.88rem;color:var(--text2);text-align:left;display:flex;align-items:center;gap:0.9rem;
+}
+.quiz-opt:hover:not(.disabled){border-color:var(--accent);color:var(--text);background:rgba(0,240,255,0.04);}
+.quiz-opt.correct{border-color:var(--accent4);background:rgba(16,217,140,0.08);color:var(--accent4);}
+.quiz-opt.wrong{border-color:var(--danger);background:rgba(255,71,87,0.08);color:var(--danger);}
+.quiz-opt.disabled{pointer-events:none;}
+.opt-letter{width:26px;height:26px;border:1px solid currentColor;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-family:'JetBrains Mono',monospace;font-weight:700;flex-shrink:0;}
+.quiz-fb{margin-top:1.25rem;padding:1rem 1.4rem;border-radius:9px;font-size:0.88rem;display:none;line-height:1.6;}
+.quiz-fb.show{display:block;}
+.quiz-fb.correct{background:rgba(16,217,140,0.08);border:1px solid rgba(16,217,140,0.25);color:var(--accent4);}
+.quiz-fb.wrong{background:rgba(255,71,87,0.08);border:1px solid rgba(255,71,87,0.25);color:var(--danger);}
+.quiz-nav{display:flex;justify-content:flex-end;margin-top:1.75rem;}
+.quiz-score-screen{text-align:center;padding:3rem;}
+.score-big{font-size:5rem;font-weight:900;font-family:'JetBrains Mono',monospace;background:linear-gradient(135deg,var(--accent),var(--accent2),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+
+/* ============================================================ CHALLENGES */
+.challenges-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;}
+.chal-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:var(--transition);}
+.chal-card:hover{transform:translateY(-3px);box-shadow:0 15px 50px rgba(0,0,0,0.4);}
+.chal-head{padding:1.1rem 1.4rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.diff{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;padding:0.22rem 0.55rem;border-radius:5px;font-family:'JetBrains Mono',monospace;font-weight:700;}
+.diff-e{background:rgba(16,217,140,0.12);color:var(--accent4);}
+.diff-m{background:rgba(245,158,11,0.12);color:var(--accent3);}
+.diff-h{background:rgba(255,71,87,0.12);color:var(--danger);}
+.chal-body{padding:1.4rem;}
+.chal-title{font-size:0.95rem;font-weight:700;margin-bottom:0.4rem;}
+.chal-desc{font-size:0.83rem;color:var(--text2);line-height:1.65;margin-bottom:1.1rem;}
+.code-pre{
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:0.9rem;font-family:'JetBrains Mono',monospace;font-size:0.76rem;
+  color:var(--accent4);white-space:pre;overflow-x:auto;margin-bottom:0.9rem;line-height:1.7;
+}
+.code-kw{color:var(--accent2);}.code-cm{color:var(--text3);}.code-str{color:var(--accent3);}.code-n{color:var(--accent);}
+
+/* ============================================================ SCROLL ANIMATION */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity 0.6s ease,transform 0.6s ease;}
+.reveal.in{opacity:1;transform:translateY(0);}
+.rd1{transition-delay:0.08s;}.rd2{transition-delay:0.16s;}.rd3{transition-delay:0.24s;}.rd4{transition-delay:0.32s;}
+
+/* ============================================================ FOOTER */
+footer{border-top:1px solid var(--border);padding:2.5rem 2rem;text-align:center;}
+.footer-logo{font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem;}
+.footer-logo span{color:var(--accent2);}
+.footer-sub{font-size:0.78rem;color:var(--text3);font-family:'JetBrains Mono',monospace;}
+
+/* ============================================================ RESPONSIVE */
+@media(max-width:768px){
+  .nav-links{display:none;}
+  nav{padding:0 1.25rem;}
+  .cmp-grid,.types-pair,.adv-grid,.grid-2,.deadlock-conditions{grid-template-columns:1fr;}
+  .hero-stats{gap:1.5rem;}
+  section{padding:4rem 0;}
+  .page-wrap{padding:0 1.25rem;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#home">
+    <div class="nav-logo-icon">🧵</div>
+    <div class="nav-logo-text">Thread<span>OS</span></div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#home" class="active">Home</a></li>
+    <li><a href="#concepts">Concepts</a></li>
+    <li><a href="#sync">Sync & Issues</a></li>
+    <li><a href="#models">Models</a></li>
+    <li><a href="#mindmap">Mind Map</a></li>
+    <li><a href="#simulator">Simulator</a></li>
+    <li><a href="#quiz">Quiz</a></li>
+    <li><a href="#challenges">Challenges</a></li>
+  </ul>
+</nav>
+<div class="nav-progress" id="navProgress"></div>
+
+<!-- ============================================================ HERO -->
+<section id="home">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div id="particles"></div>
+  <div class="hero-content">
+    <span class="hero-tag">⚡ Operating Systems · Concurrency · Parallelism</span>
+    <h1 class="hero-title">
+      <span class="l1">Master the Art</span>
+      <span class="l2">of Threads</span>
+    </h1>
+    <p class="hero-sub">The complete interactive guide to threads — from absolute zero to expert. Animated diagrams, live simulators, deep synchronization concepts, mind maps, quizzes and coding challenges.</p>
+    <div class="hero-ctas">
+      <a href="#concepts" class="btn-primary">Start Learning →</a>
+      <a href="#simulator" class="btn-secondary">Open Simulator</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><span class="stat-num" data-count="8">0</span><span class="stat-label">Deep Sections</span></div>
+      <div class="stat"><span class="stat-num" data-count="4">0</span><span class="stat-label">Thread Models</span></div>
+      <div class="stat"><span class="stat-num" data-count="3">0</span><span class="stat-label">Live Simulators</span></div>
+      <div class="stat"><span class="stat-num" data-count="15">0</span><span class="stat-label">Quiz Questions</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ CONCEPTS -->
+<section id="concepts">
+  <div class="page-wrap">
+    <div class="section-header reveal">
+      <span class="section-tag">Chapter 01</span>
+      <h2 class="section-title">What Are Threads?</h2>
+      <p class="section-sub">A thread is the smallest unit of CPU execution — a single sequence stream within a process, sometimes called a lightweight process.</p>
+    </div>
+
+    <!-- Definition cards -->
+    <div class="grid-4 reveal">
+      <div class="card">
+        <div class="card-icon" style="background:rgba(0,240,255,0.1)">🧵</div>
+        <div class="card-title">Thread Definition</div>
+        <div class="card-text">A thread is a single sequence stream within a process. Also called a <strong style="color:var(--accent)">lightweight process</strong> — threads allow multiple executions of streams within a single process while sharing resources.</div>
+      </div>
+      <div class="card rd1">
+        <div class="card-icon" style="background:rgba(139,92,246,0.1)">⚡</div>
+        <div class="card-title">Why Threads?</div>
+        <div class="card-text">Threads improve application performance through <strong style="color:var(--accent2)">parallelism</strong>. Multiple threads use CPU cores simultaneously, making programs faster, more responsive, and more efficient.</div>
+      </div>
+      <div class="card rd2">
+        <div class="card-icon" style="background:rgba(245,158,11,0.1)">🔀</div>
+        <div class="card-title">Concurrency vs Parallelism</div>
+        <div class="card-text"><strong style="color:var(--accent3)">Concurrency</strong> = dealing with multiple things at once (interleaving). <strong style="color:var(--accent3)">Parallelism</strong> = doing multiple things truly simultaneously on multiple cores.</div>
+      </div>
+      <div class="card rd3">
+        <div class="card-icon" style="background:rgba(16,217,140,0.1)">🏗️</div>
+        <div class="card-title">Thread Structure</div>
+        <div class="card-text">Each thread has its own <strong style="color:var(--accent4)">stack</strong> and <strong style="color:var(--accent4)">registers</strong> (PC, index register). But all threads in a process share <em>code, data, and open files</em>.</div>
+      </div>
+    </div>
+
+    <!-- Single vs Multi diagram -->
+    <div class="viz-box reveal" style="margin-top:2.5rem">
+      <div class="viz-label">Single-Threaded vs Multi-Threaded Process</div>
+      <div class="cmp-grid">
+        <div class="proc-box">
+          <div class="proc-title"><div class="dot" style="background:var(--accent4)"></div>Single-Threaded Process</div>
+          <div class="res-grid"><div class="res-box">code</div><div class="res-box">data</div><div class="res-box">files</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-top:0.4rem">
+            <div class="res-box hi">registers</div><div class="res-box hi">stack</div>
+          </div>
+          <div class="wave-wrap" style="margin-top:1.25rem">
+            <div>
+              <div class="thread-wave">
+                <div class="ws" style="background:var(--accent)"></div><div class="ws" style="background:var(--accent)"></div>
+                <div class="ws" style="background:var(--accent)"></div><div class="ws" style="background:var(--accent)"></div>
+                <div class="ws" style="background:var(--accent)"></div><div class="ws" style="background:var(--accent)"></div>
+                <div class="ws" style="background:var(--accent)"></div>
+              </div>
+              <div class="wlabel">1 thread</div>
+            </div>
+          </div>
+          <div style="margin-top:0.9rem;font-size:0.8rem;color:var(--text2);line-height:1.55">One execution path. If it blocks on I/O, everything waits.</div>
+        </div>
+        <div class="proc-box" style="border-color:rgba(0,240,255,0.18)">
+          <div class="proc-title"><div class="dot" style="background:var(--accent)"></div>Multi-Threaded Process</div>
+          <div class="res-grid"><div class="res-box">code</div><div class="res-box">data</div><div class="res-box">files</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem;margin-top:0.4rem">
+            <div class="res-box hi">regs</div><div class="res-box hi">regs</div><div class="res-box hi">regs</div>
+            <div class="res-box hi">stack</div><div class="res-box hi">stack</div><div class="res-box hi">stack</div>
+          </div>
+          <div class="wave-wrap" style="margin-top:1.25rem">
+            <div><div class="thread-wave"><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div></div><div class="wlabel">T1</div></div>
+            <div><div class="thread-wave"><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div></div><div class="wlabel">T2</div></div>
+            <div><div class="thread-wave"><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div></div><div class="wlabel">T3</div></div>
+          </div>
+          <div style="margin-top:0.9rem;font-size:0.8rem;color:var(--text2);line-height:1.55">Three concurrent threads share code/data/files. Each has own stack & registers.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Process vs Thread Table -->
+    <div class="reveal" style="margin-top:2rem">
+      <h3 class="sub">Processes vs Threads — Complete Comparison</h3>
+      <table class="tbl">
+        <thead><tr><th>Feature</th><th>Process</th><th>Thread</th></tr></thead>
+        <tbody>
+          <tr><td class="td-feat">CPU Sharing</td><td class="td-yes">Yes</td><td class="td-yes">Yes</td></tr>
+          <tr><td class="td-feat">Sequential Execution</td><td class="td-yes">Yes</td><td class="td-yes">Yes</td></tr>
+          <tr><td class="td-feat">Can Create Children</td><td class="td-yes">Yes</td><td class="td-yes">Yes</td></tr>
+          <tr><td class="td-feat">Independent of Others</td><td class="td-yes">Yes</td><td class="td-no">No</td></tr>
+          <tr><td class="td-feat">Shared Address Space</td><td class="td-no">No</td><td class="td-yes">Yes</td></tr>
+          <tr><td class="td-feat">Shared Code/Data/Files</td><td class="td-no">No</td><td class="td-yes">Yes</td></tr>
+          <tr><td class="td-feat">Own Stack & Registers</td><td class="td-yes">Yes</td><td class="td-yes">Yes</td></tr>
+          <tr><td class="td-feat">Creation Time</td><td style="color:var(--danger)">Slow (100–1000ms)</td><td style="color:var(--accent4)">Fast (1–10ms)</td></tr>
+          <tr><td class="td-feat">Context Switch</td><td style="color:var(--danger)">Expensive</td><td style="color:var(--accent4)">Cheap</td></tr>
+          <tr><td class="td-feat">Communication</td><td style="color:var(--text2)">IPC (pipes, sockets)</td><td style="color:var(--accent4)">Shared memory</td></tr>
+          <tr><td class="td-feat">Isolation</td><td style="color:var(--accent4)">Complete</td><td style="color:var(--danger)">Minimal (shared memory)</td></tr>
+          <tr><td class="td-feat">Failure Impact</td><td style="color:var(--accent4)">Only that process</td><td style="color:var(--danger)">Can crash whole process</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Thread Components -->
+    <div style="margin-top:3.5rem">
+      <h3 class="sub reveal">Thread Components Explained</h3>
+      <p class="body reveal">Every thread has both shared and private components — understanding this distinction is fundamental.</p>
+      <div class="grid-3 reveal">
+        <div class="card"><div class="card-icon" style="background:rgba(0,240,255,0.08)">📋</div><div class="card-title" style="color:var(--accent)">Code (Shared)</div><div class="card-text">All threads execute within the same code segment. They can run same or different functions from the same binary. No duplication — lightweight!</div></div>
+        <div class="card rd1"><div class="card-icon" style="background:rgba(245,158,11,0.08)">🌐</div><div class="card-title" style="color:var(--accent3)">Data (Shared)</div><div class="card-text">Global variables and heap are shared among all threads. Easy communication — but requires synchronization (mutexes) to avoid race conditions.</div></div>
+        <div class="card rd2"><div class="card-icon" style="background:rgba(16,217,140,0.08)">📂</div><div class="card-title" style="color:var(--accent4)">Files (Shared)</div><div class="card-text">Open file descriptors are shared. All threads can read/write the same files. Closing a file in one thread affects all threads in that process.</div></div>
+        <div class="card rd3"><div class="card-icon" style="background:rgba(139,92,246,0.08)">🔧</div><div class="card-title" style="color:var(--accent2)">Registers (Private)</div><div class="card-text">Each thread has its own CPU registers: <em>Program Counter</em> (next instruction), <em>Index Register</em>, Stack Pointer, and general-purpose registers. Saved on context switch.</div></div>
+        <div class="card rd4"><div class="card-icon" style="background:rgba(255,71,87,0.08)">📦</div><div class="card-title" style="color:var(--danger)">Stack (Private)</div><div class="card-text">Each thread's own call stack — stores function frames, local variables, and return addresses. Threads can call functions independently without interfering.</div></div>
+        <div class="card"><div class="card-icon" style="background:rgba(0,240,255,0.08)">🆔</div><div class="card-title">Thread ID (Private)</div><div class="card-text">A unique identifier assigned by OS or thread library. Used to manage, target, join, or cancel specific threads during the process lifecycle.</div></div>
+      </div>
+    </div>
+
+    <!-- Thread Types -->
+    <div style="margin-top:3.5rem">
+      <h3 class="sub reveal">Thread Classification: User vs Kernel</h3>
+      <p class="body reveal">All threads are classified based on where they are created and managed.</p>
+      <div class="types-pair reveal">
+        <div class="type-card user-t">
+          <div class="type-title"><span>👤</span> User Threads</div>
+          <div class="type-desc">Managed entirely in user space by a thread library. The OS kernel has no direct knowledge of them. Very fast to create and context-switch, but limited.</div>
+          <ul class="type-list">
+            <li>Managed by: POSIX Pthreads, Java threads, GNU Portable Threads</li>
+            <li>No kernel involvement → extremely fast context switching</li>
+            <li>One blocking system call blocks ALL user threads in process</li>
+            <li>Cannot achieve true parallelism in many-to-one model</li>
+            <li>Scheduler is entirely in user space (customizable)</li>
+            <li>Example: Solaris Green Threads (historical)</li>
+          </ul>
+        </div>
+        <div class="type-card kernel-t">
+          <div class="type-title"><span>⚙️</span> Kernel Threads</div>
+          <div class="type-desc">Directly managed by the OS kernel. First-class citizens — the scheduler knows about each one and can distribute them across multiple CPU cores.</div>
+          <ul class="type-list">
+            <li>Created/managed by: the OS kernel directly</li>
+            <li>Heavier than user threads — kernel call overhead per operation</li>
+            <li>True parallelism on multicore systems ✓</li>
+            <li>One thread blocking does NOT block all others</li>
+            <li>Scheduler handles them natively (priority, CPU affinity)</li>
+            <li>Examples: Windows threads, Linux pthreads</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 Advantages -->
+    <div style="margin-top:3.5rem">
+      <h3 class="sub reveal">4 Key Advantages of Multithreading</h3>
+      <p class="body reveal">These four advantages make multithreading an essential tool in modern systems programming.</p>
+      <div class="adv-grid reveal">
+        <div class="adv-item"><div class="adv-n">01</div><div class="adv-c"><h4>⚡ Responsiveness</h4><p>Even if part of a process is blocked or doing heavy work, other threads continue. UI stays responsive while background threads load data — critical for interactive apps, games, and web servers.</p></div></div>
+        <div class="adv-item"><div class="adv-n">02</div><div class="adv-c"><h4>🔗 Resource Sharing</h4><p>Threads share memory and resources of the process by default. No complex IPC mechanisms needed — just shared variables. Far more efficient than process-to-process pipes or message queues.</p></div></div>
+        <div class="adv-item"><div class="adv-n">03</div><div class="adv-c"><h4>💰 Economy</h4><p>Creating and context-switching threads is ~30x cheaper than processes. Less memory overhead since threads share the address space. Thread pools reuse threads, eliminating repeated creation cost.</p></div></div>
+        <div class="adv-item"><div class="adv-n">04</div><div class="adv-c"><h4>📈 Scalability</h4><p>Multithreaded programs fully exploit multiprocessor architectures. Each thread can run on a different CPU core in true parallel. A 16-core machine can run 16 threads simultaneously.</p></div></div>
+      </div>
+    </div>
+
+    <!-- Thread Lifecycle -->
+    <div style="margin-top:3.5rem">
+      <h3 class="sub reveal">Thread Lifecycle & States</h3>
+      <p class="body reveal">Every thread transitions through well-defined states from creation to termination. Understanding these states is essential for debugging and synchronization.</p>
+      <div class="viz-box reveal">
+        <svg viewBox="0 0 820 240" style="width:100%;max-height:240px;display:block">
+          <defs>
+            <marker id="a0" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 Z" fill="rgba(255,255,255,0.25)"/></marker>
+            <marker id="aR" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 Z" fill="rgba(255,71,87,0.6)"/></marker>
+            <marker id="aA" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 Z" fill="rgba(245,158,11,0.6)"/></marker>
+            <marker id="aP" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 Z" fill="rgba(139,92,246,0.6)"/></marker>
+            <marker id="aG" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L7 3 L0 6 Z" fill="rgba(16,217,140,0.6)"/></marker>
+          </defs>
+          <!-- NEW -->
+          <rect x="15" y="90" width="110" height="54" rx="12" fill="rgba(0,240,255,0.07)" stroke="rgba(0,240,255,0.45)" stroke-width="1.5"/>
+          <text x="70" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#00f0ff" font-weight="700">NEW</text>
+          <text x="70" y="131" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">created</text>
+          <!-- RUNNABLE -->
+          <rect x="180" y="90" width="130" height="54" rx="12" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.45)" stroke-width="1.5"/>
+          <text x="245" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#f59e0b" font-weight="700">RUNNABLE</text>
+          <text x="245" y="131" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">ready / running</text>
+          <!-- BLOCKED -->
+          <rect x="365" y="18" width="120" height="54" rx="12" fill="rgba(255,71,87,0.07)" stroke="rgba(255,71,87,0.45)" stroke-width="1.5"/>
+          <text x="425" y="43" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#ff4757" font-weight="700">BLOCKED</text>
+          <text x="425" y="59" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">I/O wait</text>
+          <!-- WAITING -->
+          <rect x="365" y="162" width="120" height="54" rx="12" fill="rgba(139,92,246,0.07)" stroke="rgba(139,92,246,0.45)" stroke-width="1.5"/>
+          <text x="425" y="187" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#8b5cf6" font-weight="700">WAITING</text>
+          <text x="425" y="203" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">wait() / sleep()</text>
+          <!-- TERMINATED -->
+          <rect x="680" y="90" width="130" height="54" rx="12" fill="rgba(16,217,140,0.07)" stroke="rgba(16,217,140,0.45)" stroke-width="1.5"/>
+          <text x="745" y="115" text-anchor="middle" font-family="JetBrains Mono" font-size="12" fill="#10d98c" font-weight="700">TERMINATED</text>
+          <text x="745" y="131" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">done / exited</text>
+          <!-- NEW → RUNNABLE -->
+          <line x1="125" y1="117" x2="180" y2="117" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" marker-end="url(#a0)"/>
+          <text x="152" y="110" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#8888aa">start()</text>
+          <!-- RUNNABLE → BLOCKED -->
+          <path d="M300 100 Q325 55 365 45" stroke="rgba(255,71,87,0.45)" stroke-width="1.5" fill="none" marker-end="url(#aR)"/>
+          <text x="318" y="58" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#ff4757">I/O req</text>
+          <!-- BLOCKED → RUNNABLE -->
+          <path d="M365 60 Q330 88 310 117" stroke="rgba(245,158,11,0.45)" stroke-width="1.5" fill="none" marker-end="url(#aA)"/>
+          <text x="325" y="98" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b">I/O done</text>
+          <!-- RUNNABLE → WAITING -->
+          <path d="M300 135 Q325 170 365 180" stroke="rgba(139,92,246,0.45)" stroke-width="1.5" fill="none" marker-end="url(#aP)"/>
+          <text x="320" y="174" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#8b5cf6">wait()</text>
+          <!-- WAITING → RUNNABLE -->
+          <path d="M365 192 Q335 168 310 138" stroke="rgba(245,158,11,0.45)" stroke-width="1.5" fill="none" marker-end="url(#aA)"/>
+          <text x="325" y="158" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b">notify()</text>
+          <!-- RUNNABLE → TERMINATED -->
+          <line x1="310" y1="117" x2="680" y2="117" stroke="rgba(16,217,140,0.3)" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#aG)"/>
+          <text x="495" y="110" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#10d98c">run() completes</text>
+        </svg>
+      </div>
+
+      <div class="reveal" style="margin-top:1.5rem">
+        <table class="tbl">
+          <thead><tr><th>State</th><th>Description</th><th>How to Enter</th><th>How to Exit</th></tr></thead>
+          <tbody>
+            <tr><td class="td-feat">NEW</td><td>Thread created, not yet started</td><td>new Thread()</td><td>Calling start()</td></tr>
+            <tr><td class="td-feat">RUNNABLE</td><td>Ready for CPU or actively running</td><td>start() called / unblocked</td><td>Block, wait, or finish</td></tr>
+            <tr><td class="td-feat">BLOCKED</td><td>Waiting for I/O, lock, or resource</td><td>System call / lock contention</td><td>Resource becomes available</td></tr>
+            <tr><td class="td-feat">WAITING</td><td>Waiting for explicit signal/notification</td><td>wait() / sleep() / join()</td><td>notify() / notifyAll()</td></tr>
+            <tr><td class="td-feat">TERMINATED</td><td>Finished or killed</td><td>run() returns / exception</td><td>No exit (final state)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <section class="chapter" id="lifecycle">
+  <div class="reveal">
+    <h3>Detailed State Descriptions</h3>
+
+    <h4>1. NEW (Created)</h4>
+    <p>The thread has been created but has not yet started executing. The OS has allocated a TCB and initialized it. The thread is waiting for the scheduler to admit it to the ready queue.</p>
+
+    <h4>2. RUNNABLE (Ready)</h4>
+    <p>The thread is ready to execute and is waiting in the <strong>ready queue</strong> for CPU time.</p>
+
+    <h4>3. RUNNING</h4>
+    <p>The thread is currently executing on a CPU core.</p>
+
+    <h4>4. BLOCKED (Waiting for I/O)</h4>
+    <p>The thread is waiting for an I/O operation to complete.</p>
+
+    <h4>5. WAITING (Timed/Indefinite)</h4>
+    <p>The thread is waiting for a condition like <code>wait()</code> or <code>sleep()</code>.</p>
+
+    <h4>6. TERMINATED (Dead)</h4>
+    <p>The thread has completed execution or was terminated.</p>
+
+    <div class="highlight-box hb-info">
+      <span class="hb-icon">💡</span>
+      <div class="hb-content">
+        <strong>Context Switch</strong>
+        <p>CPU switches between threads by saving/restoring state using TCB.</p>
+      </div>
+    </div>
+  </div>
+</section>
+    <!-- Thread Creation Code -->
+    <div style="margin-top:3.5rem">
+      <h3 class="sub reveal">Thread Creation — In 3 Languages</h3>
+      <div class="code-block reveal">
+        <div class="code-header"><span class="code-lang">Java — Two Approaches</span><div class="code-dots"><div class="code-dot" style="background:#ff5f56"></div><div class="code-dot" style="background:#ffbd2e"></div><div class="code-dot" style="background:#27c93f"></div></div></div>
+        <pre><span class="cm">// Approach 1: Extend Thread</span>
+<span class="kw">class</span> <span class="fn">MyThread</span> <span class="kw">extends</span> Thread {
+    <span class="kw">public void</span> <span class="fn">run</span>() { System.out.<span class="fn">println</span>(<span class="str">"Running: "</span> + Thread.<span class="fn">currentThread</span>().<span class="fn">getName</span>()); }
+}
+<span class="kw">new</span> <span class="fn">MyThread</span>().<span class="fn">start</span>();  <span class="cm">// ALWAYS use start(), not run()!</span>
+
+<span class="cm">// Approach 2: Implement Runnable (preferred)</span>
+Thread t = <span class="kw">new</span> <span class="fn">Thread</span>(() -> System.out.<span class="fn">println</span>(<span class="str">"Lambda thread!"</span>));
+t.<span class="fn">start</span>();
+
+<span class="cm">// Important thread methods:</span>
+t.<span class="fn">join</span>();        <span class="cm">// Wait for t to finish</span>
+Thread.<span class="fn">sleep</span>(500); <span class="cm">// Pause 500ms</span>
+t.<span class="fn">interrupt</span>();   <span class="cm">// Request interruption</span></pre>
+      </div>
+      <div class="code-block reveal">
+        <div class="code-header"><span class="code-lang">C — POSIX Pthreads</span><div class="code-dots"><div class="code-dot" style="background:#ff5f56"></div><div class="code-dot" style="background:#ffbd2e"></div><div class="code-dot" style="background:#27c93f"></div></div></div>
+        <pre>#<span class="kw">include</span> <span class="str">&lt;pthread.h&gt;</span>
+
+<span class="kw">void</span>* <span class="fn">thread_func</span>(<span class="kw">void</span>* arg) {
+    <span class="kw">int</span> id = *(<span class="kw">int</span>*)arg;
+    printf(<span class="str">"Thread %d running\n"</span>, id);
+    <span class="kw">return</span> NULL;
+}
+
+<span class="kw">int</span> <span class="fn">main</span>() {
+    pthread_t threads[4];
+    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; 4; i++)
+        pthread_create(&threads[i], NULL, thread_func, &i);
+    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; 4; i++)
+        pthread_join(threads[i], NULL);  <span class="cm">// Wait for all</span>
+}</pre>
+      </div>
+      <div class="code-block reveal">
+        <div class="code-header"><span class="code-lang">Python — threading module</span><div class="code-dots"><div class="code-dot" style="background:#ff5f56"></div><div class="code-dot" style="background:#ffbd2e"></div><div class="code-dot" style="background:#27c93f"></div></div></div>
+        <pre><span class="kw">import</span> threading
+
+<span class="kw">def</span> <span class="fn">worker</span>(thread_id):
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(3):
+        print(<span class="fn">f</span><span class="str">"Thread {thread_id}: step {i}"</span>)
+
+threads = [threading.Thread(target=worker, args=(i,)) <span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(3)]
+<span class="kw">for</span> t <span class="kw">in</span> threads: t.<span class="fn">start</span>()
+<span class="kw">for</span> t <span class="kw">in</span> threads: t.<span class="fn">join</span>()  <span class="cm"># Wait for all threads</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ SYNCHRONIZATION -->
+<section id="sync">
+  <div class="page-wrap">
+    <div class="section-header reveal">
+      <span class="section-tag">Chapter 02</span>
+      <h2 class="section-title">Synchronization & Concurrency Issues</h2>
+      <p class="section-sub">The dark side of threads — race conditions, deadlocks, and the tools to tame them.</p>
+    </div>
+
+    <div class="info-box ib-danger reveal">
+      <span class="ib-icon">⚠️</span>
+      <div class="ib-body"><strong>Critical Issue:</strong> When multiple threads access shared data simultaneously and at least one modifies it, you get a <strong>race condition</strong> — unpredictable behavior, corrupted data, and bugs that only appear under specific timing conditions.</div>
+    </div>
+
+    <!-- Sync mechanisms -->
+    <div class="sync-grid reveal">
+      <div class="sync-card" style="border-top:2px solid var(--danger)">
+        <div class="sync-icon">🏁</div>
+        <div class="sync-title">Race Condition</div>
+        <div class="sync-text">Outcome depends on thread execution order. E.g., two threads both read counter=5, both add 1 and write back 6 — final value is 6 instead of 7. The increment was <em>lost</em>.</div>
+      </div>
+      <div class="sync-card" style="border-top:2px solid var(--accent)">
+        <div class="sync-icon">🔒</div>
+        <div class="sync-title">Mutex / Lock</div>
+        <div class="sync-text">Mutual exclusion lock. Only one thread can hold it at a time. Others block until it's released. Prevents race conditions by serializing critical sections of code.</div>
+      </div>
+      <div class="sync-card" style="border-top:2px solid var(--accent2)">
+        <div class="sync-icon">🚦</div>
+        <div class="sync-title">Semaphore</div>
+        <div class="sync-text">A counter-based synchronization tool. Binary semaphore (0/1) acts like a mutex. Counting semaphore limits concurrent access — e.g., only 3 threads can use a DB connection pool at once.</div>
+      </div>
+      <div class="sync-card" style="border-top:2px solid var(--accent3)">
+        <div class="sync-icon">📡</div>
+        <div class="sync-title">Condition Variable / Monitor</div>
+        <div class="sync-text">Allows threads to wait for specific conditions. A thread calls wait() to sleep, another calls notify() to wake it up. Used in producer-consumer patterns — producer signals consumer when data is ready.</div>
+      </div>
+      <div class="sync-card" style="border-top:2px solid var(--accent4)">
+        <div class="sync-icon">⚛️</div>
+        <div class="sync-title">Atomic Operations</div>
+        <div class="sync-text">Hardware-guaranteed indivisible operations. AtomicInteger in Java, std::atomic in C++. No lock needed — CPU handles the synchronization at the instruction level. Fastest option for simple counters.</div>
+      </div>
+      <div class="sync-card" style="border-top:2px solid var(--text3)">
+        <div class="sync-icon">📖</div>
+        <div class="sync-title">Read-Write Lock</div>
+        <div class="sync-text">Multiple readers allowed simultaneously, but only one writer at a time. Perfect for read-heavy scenarios like caches. Writers get exclusive access; readers share access among themselves.</div>
+      </div>
+    </div>
+
+    <div class="code-block reveal">
+      <div class="code-header"><span class="code-lang">Python — Race Condition vs Fixed</span><div class="code-dots"><div class="code-dot" style="background:#ff5f56"></div><div class="code-dot" style="background:#ffbd2e"></div><div class="code-dot" style="background:#27c93f"></div></div></div>
+      <pre><span class="cm">### ❌ WRONG — Race Condition</span>
+counter = 0
+<span class="kw">def</span> <span class="fn">increment</span>():
+    <span class="kw">global</span> counter
+    <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(100000):
+        counter += 1  <span class="cm"># NOT atomic! read-modify-write = 3 steps</span>
+<span class="cm"># Expected: 200000 — Actual: ~153000 (lost updates!)</span>
+
+<span class="cm">### ✅ CORRECT — With Lock</span>
+lock = threading.Lock()
+<span class="kw">def</span> <span class="fn">safe_increment</span>():
+    <span class="kw">global</span> counter
+    <span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(100000):
+        <span class="kw">with</span> lock:  <span class="cm"># acquire + release automatically</span>
+            counter += 1
+<span class="cm"># Always exactly 200000 ✓</span>
+
+<span class="cm">### ✅ Semaphore — limit 3 concurrent DB connections</span>
+db_sem = threading.Semaphore(3)
+<span class="kw">def</span> <span class="fn">query_db</span>(thread_id):
+    <span class="kw">with</span> db_sem:
+        print(<span class="fn">f</span><span class="str">"Thread {thread_id} using DB"</span>)
+        time.<span class="fn">sleep</span>(1)</pre>
+    </div>
+
+    <!-- Deadlock -->
+    <h3 class="sub reveal">💀 Deadlock — Four Conditions</h3>
+    <p class="body reveal">Deadlock occurs when two or more threads block forever waiting for each other. <strong>All four conditions must hold simultaneously.</strong></p>
+    <div class="deadlock-conditions reveal">
+      <div class="dl-box"><div class="dl-num">Condition 1</div><div class="dl-name">Mutual Exclusion</div><div class="dl-desc">A resource can only be held by one thread at a time. It cannot be shared simultaneously.</div></div>
+      <div class="dl-box"><div class="dl-num">Condition 2</div><div class="dl-name">Hold and Wait</div><div class="dl-desc">A thread holds one resource while waiting for another that is held by a different thread.</div></div>
+      <div class="dl-box"><div class="dl-num">Condition 3</div><div class="dl-name">No Preemption</div><div class="dl-desc">Resources cannot be forcibly taken from a thread. They must be voluntarily released.</div></div>
+      <div class="dl-box"><div class="dl-num">Condition 4</div><div class="dl-name">Circular Wait</div><div class="dl-desc">Thread A waits for Thread B, Thread B waits for Thread C, Thread C waits for Thread A → circle.</div></div>
+    </div>
+
+    <div class="code-block reveal">
+      <div class="code-header"><span class="code-lang">Python — Deadlock & Fix</span><div class="code-dots"><div class="code-dot" style="background:#ff5f56"></div><div class="code-dot" style="background:#ffbd2e"></div><div class="code-dot" style="background:#27c93f"></div></div></div>
+      <pre><span class="cm">### ❌ DEADLOCK</span>
+lock_A = threading.Lock(); lock_B = threading.Lock()
+
+<span class="kw">def</span> <span class="fn">thread1</span>():
+    lock_A.<span class="fn">acquire</span>(); time.<span class="fn">sleep</span>(0.1)
+    lock_B.<span class="fn">acquire</span>()  <span class="cm"># waits for B (held by thread2)</span>
+
+<span class="kw">def</span> <span class="fn">thread2</span>():
+    lock_B.<span class="fn">acquire</span>(); time.<span class="fn">sleep</span>(0.1)
+    lock_A.<span class="fn">acquire</span>()  <span class="cm"># waits for A (held by thread1) → DEADLOCK!</span>
+
+<span class="cm">### ✅ FIX — Always acquire locks in same order</span>
+<span class="kw">def</span> <span class="fn">thread2_fixed</span>():
+    lock_A.<span class="fn">acquire</span>()  <span class="cm"># A first — same order as thread1</span>
+    time.<span class="fn">sleep</span>(0.1)
+    lock_B.<span class="fn">acquire</span>()  <span class="cm"># B second — no circular wait ✓</span>
+    lock_B.<span class="fn">release</span>(); lock_A.<span class="fn">release</span>()</pre>
+    </div>
+
+    <!-- Producer Consumer -->
+    <h3 class="sub reveal">Producer-Consumer Pattern</h3>
+    <div class="code-block reveal">
+      <div class="code-header"><span class="code-lang">Java — Thread-Safe Queue</span><div class="code-dots"><div class="code-dot" style="background:#ff5f56"></div><div class="code-dot" style="background:#ffbd2e"></div><div class="code-dot" style="background:#27c93f"></div></div></div>
+      <pre><span class="kw">class</span> <span class="fn">SharedQueue</span> {
+    <span class="kw">private</span> Queue&lt;Integer&gt; q = <span class="kw">new</span> <span class="fn">LinkedList</span>&lt;&gt;();
+    <span class="kw">private static final int</span> MAX = 10;
+
+    <span class="kw">public synchronized void</span> <span class="fn">produce</span>(<span class="kw">int</span> val) <span class="kw">throws</span> Exception {
+        <span class="kw">while</span> (q.<span class="fn">size</span>() == MAX) wait();  <span class="cm">// queue full, wait</span>
+        q.<span class="fn">add</span>(val);
+        <span class="fn">notifyAll</span>();  <span class="cm">// wake consumers</span>
+    }
+    <span class="kw">public synchronized int</span> <span class="fn">consume</span>() <span class="kw">throws</span> Exception {
+        <span class="kw">while</span> (q.<span class="fn">isEmpty</span>()) wait();  <span class="cm">// nothing to consume</span>
+        <span class="kw">int</span> val = q.<span class="fn">poll</span>();
+        <span class="fn">notifyAll</span>();  <span class="cm">// wake producers</span>
+        <span class="kw">return</span> val;
+    }
+}</pre>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ MODELS -->
+<div class="band">
+<div id="models" style="scroll-margin-top:68px">
+  <div class="page-wrap">
+    <div class="section-header reveal" style="padding-top:0">
+      <span class="section-tag">Chapter 03</span>
+      <h2 class="section-title">Multithreading Models</h2>
+      <p class="section-sub">How user-level threads map to kernel threads defines the model. Each has distinct tradeoffs in parallelism, overhead, and portability.</p>
+    </div>
+    <div class="models-grid">
+      <!-- Many-to-One -->
+      <div class="model-card reveal rd1">
+        <div class="mc-head"><div class="mc-badge" style="background:rgba(255,71,87,0.15);color:#ff4757">M:1</div><div><div class="mc-name">Many-to-One</div><div class="mc-sub">Many user threads → 1 kernel thread</div></div></div>
+        <div class="mc-diag">
+          <svg viewBox="0 0 260 170" style="width:100%;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+            <text x="130" y="18" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">USER SPACE</text>
+            <rect x="10" y="24" width="14" height="55" rx="3" fill="rgba(0,240,255,0.15)" stroke="rgba(0,240,255,0.5)" stroke-width="1"/>
+            <rect x="50" y="24" width="14" height="55" rx="3" fill="rgba(0,240,255,0.15)" stroke="rgba(0,240,255,0.5)" stroke-width="1"/>
+            <rect x="90" y="24" width="14" height="55" rx="3" fill="rgba(0,240,255,0.15)" stroke="rgba(0,240,255,0.5)" stroke-width="1"/>
+            <rect x="130" y="24" width="14" height="55" rx="3" fill="rgba(0,240,255,0.15)" stroke="rgba(0,240,255,0.5)" stroke-width="1"/>
+            <rect x="170" y="24" width="14" height="55" rx="3" fill="rgba(0,240,255,0.15)" stroke="rgba(0,240,255,0.5)" stroke-width="1"/>
+            <text x="17" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#00f0ff">T1</text>
+            <text x="57" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#00f0ff">T2</text>
+            <text x="97" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#00f0ff">T3</text>
+            <text x="137" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#00f0ff">T4</text>
+            <text x="177" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#00f0ff">T5</text>
+            <line x1="17" y1="79" x2="110" y2="128" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <line x1="57" y1="79" x2="110" y2="128" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <line x1="97" y1="79" x2="110" y2="128" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <line x1="137" y1="79" x2="110" y2="128" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <line x1="177" y1="79" x2="110" y2="128" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+            <line x1="0" y1="120" x2="260" y2="120" stroke="rgba(30,30,56,0.9)" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="220" y="116" font-family="JetBrains Mono" font-size="6.5" fill="#3a3a5c">KERNEL</text>
+            <circle cx="110" cy="150" r="16" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <text x="110" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#8b5cf6" font-weight="700">K</text>
+          </svg>
+        </div>
+        <div class="mc-body">
+          <p style="font-size:0.8rem;color:var(--text2);line-height:1.6;margin-bottom:0.9rem">Many user threads managed by a single kernel thread. Fast thread management in user space — but one blocking call blocks all threads.</p>
+          <div class="mc-pros-cons">
+            <div class="pros"><div class="pros-t">Advantages</div><ul><li>Fast management</li><li>No kernel overhead</li><li>Portable</li></ul></div>
+            <div class="cons"><div class="cons-t">Disadvantages</div><ul><li>One block = all block</li><li>No true parallelism</li><li>Rarely used now</li></ul></div>
+          </div>
+          <div class="ex-row"><div class="ex-label">Examples</div><div class="ex-tags"><span class="ex-tag">Solaris Green Threads</span><span class="ex-tag">GNU Portable Threads</span></div></div>
+        </div>
+      </div>
+      <!-- One-to-One -->
+      <div class="model-card reveal rd2">
+        <div class="mc-head"><div class="mc-badge" style="background:rgba(16,217,140,0.15);color:#10d98c">1:1</div><div><div class="mc-name">One-to-One</div><div class="mc-sub">Each user thread → own kernel thread</div></div></div>
+        <div class="mc-diag">
+          <svg viewBox="0 0 260 170" style="width:100%;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+            <text x="130" y="18" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">USER SPACE</text>
+            <rect x="15" y="24" width="14" height="55" rx="3" fill="rgba(16,217,140,0.15)" stroke="rgba(16,217,140,0.5)" stroke-width="1"/>
+            <rect x="75" y="24" width="14" height="55" rx="3" fill="rgba(16,217,140,0.15)" stroke="rgba(16,217,140,0.5)" stroke-width="1"/>
+            <rect x="135" y="24" width="14" height="55" rx="3" fill="rgba(16,217,140,0.15)" stroke="rgba(16,217,140,0.5)" stroke-width="1"/>
+            <rect x="195" y="24" width="14" height="55" rx="3" fill="rgba(16,217,140,0.15)" stroke="rgba(16,217,140,0.5)" stroke-width="1"/>
+            <text x="22" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#10d98c">T1</text>
+            <text x="82" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#10d98c">T2</text>
+            <text x="142" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#10d98c">T3</text>
+            <text x="202" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6.5" fill="#10d98c">T4</text>
+            <line x1="22" y1="79" x2="22" y2="120" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+            <line x1="82" y1="79" x2="82" y2="120" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+            <line x1="142" y1="79" x2="142" y2="120" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+            <line x1="202" y1="79" x2="202" y2="120" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+            <line x1="0" y1="120" x2="260" y2="120" stroke="rgba(30,30,56,0.9)" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="220" y="116" font-family="JetBrains Mono" font-size="6.5" fill="#3a3a5c">KERNEL</text>
+            <circle cx="22" cy="148" r="14" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <circle cx="82" cy="148" r="14" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <circle cx="142" cy="148" r="14" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <circle cx="202" cy="148" r="14" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <text x="22" y="152" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8b5cf6" font-weight="700">K</text>
+            <text x="82" y="152" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8b5cf6" font-weight="700">K</text>
+            <text x="142" y="152" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8b5cf6" font-weight="700">K</text>
+            <text x="202" y="152" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8b5cf6" font-weight="700">K</text>
+          </svg>
+        </div>
+        <div class="mc-body">
+          <p style="font-size:0.8rem;color:var(--text2);line-height:1.6;margin-bottom:0.9rem">Each user thread maps to its own kernel thread. True parallelism on multicore. One thread blocking doesn't affect others. Most widely used model today.</p>
+          <div class="mc-pros-cons">
+            <div class="pros"><div class="pros-t">Advantages</div><ul><li>True parallelism</li><li>Isolated blocking</li><li>Better concurrency</li></ul></div>
+            <div class="cons"><div class="cons-t">Disadvantages</div><ul><li>Kernel overhead</li><li>Thread count limited</li><li>Heavy for many threads</li></ul></div>
+          </div>
+          <div class="ex-row"><div class="ex-label">Examples</div><div class="ex-tags"><span class="ex-tag">Windows</span><span class="ex-tag">Linux pthreads</span><span class="ex-tag">Solaris 9+</span></div></div>
+        </div>
+      </div>
+      <!-- Many-to-Many -->
+      <div class="model-card reveal rd3">
+        <div class="mc-head"><div class="mc-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b">M:M</div><div><div class="mc-name">Many-to-Many</div><div class="mc-sub">Many user → Many kernel threads</div></div></div>
+        <div class="mc-diag">
+          <svg viewBox="0 0 260 180" style="width:100%;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+            <text x="130" y="18" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">USER SPACE</text>
+            <rect x="10" y="24" width="12" height="52" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.5)" stroke-width="1"/>
+            <rect x="50" y="24" width="12" height="52" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.5)" stroke-width="1"/>
+            <rect x="90" y="24" width="12" height="52" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.5)" stroke-width="1"/>
+            <rect x="130" y="24" width="12" height="52" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.5)" stroke-width="1"/>
+            <rect x="170" y="24" width="12" height="52" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.5)" stroke-width="1"/>
+            <rect x="210" y="24" width="12" height="52" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.5)" stroke-width="1"/>
+            <line x1="16" y1="76" x2="55" y2="128" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+            <line x1="56" y1="76" x2="55" y2="128" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+            <line x1="56" y1="76" x2="135" y2="128" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+            <line x1="96" y1="76" x2="55" y2="128" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+            <line x1="136" y1="76" x2="135" y2="128" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+            <line x1="176" y1="76" x2="135" y2="128" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+            <line x1="176" y1="76" x2="215" y2="128" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+            <line x1="216" y1="76" x2="215" y2="128" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+            <line x1="0" y1="120" x2="260" y2="120" stroke="rgba(30,30,56,0.9)" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="220" y="116" font-family="JetBrains Mono" font-size="6.5" fill="#3a3a5c">KERNEL</text>
+            <circle cx="55" cy="150" r="14" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <circle cx="135" cy="150" r="14" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <circle cx="215" cy="150" r="14" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <text x="55" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8b5cf6" font-weight="700">K</text>
+            <text x="135" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8b5cf6" font-weight="700">K</text>
+            <text x="215" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#8b5cf6" font-weight="700">K</text>
+          </svg>
+        </div>
+        <div class="mc-body">
+          <p style="font-size:0.8rem;color:var(--text2);line-height:1.6;margin-bottom:0.9rem">Multiplexes many user threads onto a smaller set of kernel threads. OS creates sufficient kernel threads. Avoids limitations of both previous models.</p>
+          <div class="mc-pros-cons">
+            <div class="pros"><div class="pros-t">Advantages</div><ul><li>True parallelism</li><li>No thread limit</li><li>Efficient kernel use</li></ul></div>
+            <div class="cons"><div class="cons-t">Disadvantages</div><ul><li>Complex to implement</li><li>Scheduler overhead</li><li>Less common today</li></ul></div>
+          </div>
+          <div class="ex-row"><div class="ex-label">Examples</div><div class="ex-tags"><span class="ex-tag">Solaris &lt;9</span><span class="ex-tag">Windows+ThreadFiber</span></div></div>
+        </div>
+      </div>
+      <!-- Two-Level -->
+      <div class="model-card reveal rd4">
+        <div class="mc-head"><div class="mc-badge" style="background:rgba(0,240,255,0.15);color:#00f0ff">2-L</div><div><div class="mc-name">Two-Level Model</div><div class="mc-sub">M:M + direct binding option</div></div></div>
+        <div class="mc-diag">
+          <svg viewBox="0 0 260 180" style="width:100%;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+            <text x="130" y="18" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">USER SPACE</text>
+            <rect x="10" y="24" width="12" height="52" rx="3" fill="rgba(0,240,255,0.1)" stroke="rgba(0,240,255,0.4)" stroke-width="1"/>
+            <rect x="40" y="24" width="12" height="52" rx="3" fill="rgba(0,240,255,0.1)" stroke="rgba(0,240,255,0.4)" stroke-width="1"/>
+            <rect x="70" y="24" width="12" height="52" rx="3" fill="rgba(0,240,255,0.1)" stroke="rgba(0,240,255,0.4)" stroke-width="1"/>
+            <rect x="100" y="24" width="12" height="52" rx="3" fill="rgba(0,240,255,0.1)" stroke="rgba(0,240,255,0.4)" stroke-width="1"/>
+            <rect x="195" y="24" width="14" height="52" rx="3" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.7)" stroke-width="2"/>
+            <text x="202" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="6" fill="#f59e0b">BOUND</text>
+            <line x1="16" y1="76" x2="55" y2="120" stroke="rgba(0,240,255,0.18)" stroke-width="1"/>
+            <line x1="46" y1="76" x2="55" y2="120" stroke="rgba(0,240,255,0.18)" stroke-width="1"/>
+            <line x1="76" y1="76" x2="130" y2="120" stroke="rgba(0,240,255,0.18)" stroke-width="1"/>
+            <line x1="106" y1="76" x2="130" y2="120" stroke="rgba(0,240,255,0.18)" stroke-width="1"/>
+            <line x1="202" y1="76" x2="215" y2="120" stroke="rgba(245,158,11,0.6)" stroke-width="2"/>
+            <line x1="0" y1="120" x2="260" y2="120" stroke="rgba(30,30,56,0.9)" stroke-width="1" stroke-dasharray="4,3"/>
+            <text x="220" y="116" font-family="JetBrains Mono" font-size="6.5" fill="#3a3a5c">KERNEL</text>
+            <circle cx="55" cy="150" r="13" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <circle cx="130" cy="150" r="13" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+            <circle cx="215" cy="150" r="13" fill="rgba(245,158,11,0.2)" stroke="rgba(245,158,11,0.7)" stroke-width="2"/>
+            <text x="55" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8b5cf6" font-weight="700">K</text>
+            <text x="130" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8b5cf6" font-weight="700">K</text>
+            <text x="215" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b" font-weight="700">K</text>
+          </svg>
+        </div>
+        <div class="mc-body">
+          <p style="font-size:0.8rem;color:var(--text2);line-height:1.6;margin-bottom:0.9rem">Like M:M but also allows a user thread to be directly bound to a kernel thread. Critical threads get guaranteed CPU access via 1:1 binding, others share the pool.</p>
+          <div class="mc-pros-cons">
+            <div class="pros"><div class="pros-t">Advantages</div><ul><li>Most flexible</li><li>Priority binding</li><li>Best of both</li></ul></div>
+            <div class="cons"><div class="cons-t">Disadvantages</div><ul><li>Most complex</li><li>OS-specific support</li><li>Legacy/rare</li></ul></div>
+          </div>
+          <div class="ex-row"><div class="ex-label">Examples</div><div class="ex-tags"><span class="ex-tag">IRIX</span><span class="ex-tag">HP-UX</span><span class="ex-tag">Tru64 UNIX</span><span class="ex-tag">Solaris 8−</span></div></div>
+        </div>
+      </div>
+    </div>
+    <section class="chapter" id="benefits">
+  <div class="reveal">
+    <div class="ad-grid">
+
+      <!-- Advantages -->
+      <div class="ad-box pros">
+        <div class="ad-box-title">✓ Advantages</div>
+        <ul class="ad-list">
+          <li><strong>Responsiveness:</strong> UI remains active</li>
+          <li><strong>Resource Sharing:</strong> Shared memory</li>
+          <li><strong>Economy:</strong> Faster than processes</li>
+          <li><strong>Scalability:</strong> Multi-core usage</li>
+          <li><strong>Throughput:</strong> More tasks completed</li>
+          <li><strong>Modularity:</strong> Clean structure</li>
+          <li><strong>Overlapped I/O:</strong> CPU + I/O parallel</li>
+        </ul>
+      </div>
+
+      <!-- Disadvantages -->
+      <div class="ad-box cons">
+        <div class="ad-box-title">✗ Disadvantages</div>
+        <ul class="ad-list">
+          <li><strong>Race Conditions:</strong> Data corruption</li>
+          <li><strong>Deadlock:</strong> Threads stuck</li>
+          <li><strong>Complexity:</strong> Hard to debug</li>
+          <li><strong>Testing:</strong> Non-deterministic</li>
+          <li><strong>Overhead:</strong> Context switching</li>
+          <li><strong>Memory:</strong> Stack usage</li>
+          <li><strong>Starvation:</strong> Low priority ignored</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+    <!-- Model comparison table -->
+    <div class="reveal" style="margin-top:2rem">
+      <table class="tbl">
+        <thead><tr><th>Model</th><th>True Parallelism</th><th>Blocking Effect</th><th>Complexity</th><th>Modern Usage</th></tr></thead>
+        <tbody>
+          <tr><td class="td-feat">Many-to-One</td><td class="td-no">None</td><td class="td-no">All threads block</td><td style="color:var(--accent4)">Low</td><td style="color:var(--text2)">Rare (legacy)</td></tr>
+          <tr><td class="td-feat">One-to-One</td><td class="td-yes">Full</td><td class="td-yes">Thread isolated</td><td style="color:var(--accent3)">Medium</td><td style="color:var(--accent4)">Dominant (Linux/Win)</td></tr>
+          <tr><td class="td-feat">Many-to-Many</td><td class="td-yes">Full</td><td class="td-yes">Mostly isolated</td><td style="color:var(--danger)">High</td><td style="color:var(--text2)">Uncommon</td></tr>
+          <tr><td class="td-feat">Two-Level</td><td class="td-yes">Full</td><td class="td-yes">Fully isolated</td><td style="color:var(--danger)">Highest</td><td style="color:var(--text2)">Legacy only</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="divider"></div>
+<section id="mindmap">
+  <div class="page-wrap">
+    <div class="section-header reveal">
+      <span class="section-tag">Chapter 04</span>
+      <h2 class="section-title">Complete Mind Map</h2>
+      <p class="section-sub">All threads concepts — interconnected in one visual overview. Scroll horizontally if needed.</p>
+    </div>
+    <div class="mm-wrap reveal">
+      <svg viewBox="0 0 1200 850" style="width:100%;min-width:800px;display:block">
+        
+        <line x1="550" y1="400" x2="250" y2="200" stroke="rgba(0,240,255,0.25)" stroke-width="1.5"/>
+        <line x1="550" y1="400" x2="550" y2="160" stroke="rgba(245,158,11,0.25)" stroke-width="1.5"/>
+        <line x1="550" y1="400" x2="850" y2="200" stroke="rgba(139,92,246,0.25)" stroke-width="1.5"/>
+        <line x1="550" y1="400" x2="900" y2="400" stroke="rgba(16,217,140,0.25)" stroke-width="1.5"/>
+        <line x1="550" y1="400" x2="850" y2="600" stroke="rgba(255,71,87,0.25)" stroke-width="1.5"/>
+        <line x1="550" y1="400" x2="550" y2="640" stroke="rgba(245,158,11,0.25)" stroke-width="1.5"/>
+        <line x1="550" y1="400" x2="250" y2="600" stroke="rgba(139,92,246,0.25)" stroke-width="1.5"/>
+        <line x1="550" y1="400" x2="200" y2="400" stroke="rgba(16,217,140,0.25)" stroke-width="1.5"/>
+
+        <line x1="250" y1="200" x2="105" y2="150" stroke="rgba(0,240,255,0.18)" stroke-width="1"/>
+        <line x1="250" y1="200" x2="105" y2="210" stroke="rgba(0,240,255,0.18)" stroke-width="1"/>
+
+        <line x1="550" y1="160" x2="450" y2="90" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <line x1="550" y1="160" x2="650" y2="90" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+
+        <line x1="850" y1="200" x2="795" y2="120" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <line x1="850" y1="200" x2="940" y2="120" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+
+        <line x1="900" y1="400" x2="1035" y2="310" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <line x1="900" y1="400" x2="1035" y2="360" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <line x1="900" y1="400" x2="1035" y2="410" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <line x1="900" y1="400" x2="1035" y2="460" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+
+        <line x1="850" y1="600" x2="980" y2="550" stroke="rgba(255,71,87,0.18)" stroke-width="1"/>
+        <line x1="850" y1="600" x2="980" y2="600" stroke="rgba(255,71,87,0.18)" stroke-width="1"/>
+        <line x1="850" y1="600" x2="980" y2="650" stroke="rgba(255,71,87,0.18)" stroke-width="1"/>
+        <line x1="850" y1="600" x2="980" y2="700" stroke="rgba(255,71,87,0.18)" stroke-width="1"/>
+
+        <line x1="550" y1="640" x2="370" y2="720" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <line x1="550" y1="640" x2="490" y2="720" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <line x1="550" y1="640" x2="610" y2="720" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <line x1="550" y1="640" x2="730" y2="720" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+
+        <line x1="250" y1="600" x2="120" y2="540" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <line x1="250" y1="600" x2="120" y2="590" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <line x1="250" y1="600" x2="120" y2="640" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <line x1="250" y1="600" x2="120" y2="690" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+
+        <line x1="200" y1="400" x2="80" y2="350" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <line x1="200" y1="400" x2="80" y2="450" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+
+
+        <ellipse cx="550" cy="400" rx="74" ry="42" fill="rgba(0,240,255,0.12)" stroke="rgba(0,240,255,0.55)" stroke-width="2"/>
+        <text x="550" y="396" text-anchor="middle" font-family="Orbitron,monospace" font-size="14" fill="#00f0ff" font-weight="700">THREADS</text>
+        <text x="550" y="413" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#8888aa">OS Concept</text>
+
+        <ellipse cx="250" cy="200" rx="60" ry="28" fill="rgba(0,240,255,0.08)" stroke="rgba(0,240,255,0.4)" stroke-width="1.5"/>
+        <text x="250" y="196" text-anchor="middle" font-family="Orbitron,monospace" font-size="10" fill="#00f0ff" font-weight="700">Definition</text>
+        <text x="250" y="212" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8888aa">Lightweight Process</text>
+        
+        <rect x="40" y="137" width="130" height="26" rx="6" fill="rgba(0,240,255,0.04)" stroke="rgba(0,240,255,0.18)" stroke-width="1"/>
+        <text x="105" y="154" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#8888aa">Seq. stream in process</text>
+        
+        <rect x="40" y="197" width="130" height="26" rx="6" fill="rgba(0,240,255,0.04)" stroke="rgba(0,240,255,0.18)" stroke-width="1"/>
+        <text x="105" y="214" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#8888aa">Shares CPU w/ others</text>
+
+        <ellipse cx="550" cy="160" rx="62" ry="28" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.4)" stroke-width="1.5"/>
+        <text x="550" y="156" text-anchor="middle" font-family="Orbitron,monospace" font-size="10" fill="#f59e0b" font-weight="700">Components</text>
+        <text x="550" y="172" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8888aa">Private + Shared</text>
+        
+        <rect x="380" y="77" width="140" height="26" rx="6" fill="rgba(245,158,11,0.04)" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <text x="450" y="94" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b">Shared: Code, Data, Files</text>
+        
+        <rect x="580" y="77" width="140" height="26" rx="6" fill="rgba(245,158,11,0.04)" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <text x="650" y="94" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#f59e0b">Private: Stack, Registers</text>
+
+        <ellipse cx="850" cy="200" rx="58" ry="28" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.4)" stroke-width="1.5"/>
+        <text x="850" y="196" text-anchor="middle" font-family="Orbitron,monospace" font-size="10" fill="#8b5cf6" font-weight="700">Types</text>
+        <text x="850" y="212" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8888aa">User vs Kernel</text>
+        
+        <rect x="730" y="107" width="130" height="26" rx="6" fill="rgba(139,92,246,0.04)" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <text x="795" y="124" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#8b5cf6">User Threads (fast)</text>
+        
+        <rect x="870" y="107" width="140" height="26" rx="6" fill="rgba(139,92,246,0.04)" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <text x="940" y="124" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#8b5cf6">Kernel Threads (parallel)</text>
+
+        <ellipse cx="900" cy="400" rx="64" ry="28" fill="rgba(16,217,140,0.08)" stroke="rgba(16,217,140,0.4)" stroke-width="1.5"/>
+        <text x="900" y="396" text-anchor="middle" font-family="Orbitron,monospace" font-size="10" fill="#10d98c" font-weight="700">Models</text>
+        <text x="900" y="412" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8888aa">Mapping strategies</text>
+        
+        <rect x="980" y="297" width="110" height="26" rx="5" fill="rgba(16,217,140,0.04)" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <text x="1035" y="314" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#10d98c">Many-to-One</text>
+        
+        <rect x="980" y="347" width="110" height="26" rx="5" fill="rgba(16,217,140,0.04)" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <text x="1035" y="364" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#10d98c">One-to-One</text>
+        
+        <rect x="980" y="397" width="110" height="26" rx="5" fill="rgba(16,217,140,0.04)" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <text x="1035" y="414" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#10d98c">Many-to-Many</text>
+        
+        <rect x="980" y="447" width="110" height="26" rx="5" fill="rgba(16,217,140,0.04)" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <text x="1035" y="464" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#10d98c">Two-Level</text>
+
+        <ellipse cx="850" cy="600" rx="68" ry="28" fill="rgba(255,71,87,0.08)" stroke="rgba(255,71,87,0.4)" stroke-width="1.5"/>
+        <text x="850" y="596" text-anchor="middle" font-family="Orbitron,monospace" font-size="10" fill="#ff4757" font-weight="700">Advantages</text>
+        <text x="850" y="612" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8888aa">Why use threads?</text>
+        
+        <rect x="920" y="537" width="120" height="26" rx="5" fill="rgba(255,71,87,0.04)" stroke="rgba(255,71,87,0.18)" stroke-width="1"/>
+        <text x="980" y="554" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#ff4757">Responsiveness</text>
+        
+        <rect x="920" y="587" width="120" height="26" rx="5" fill="rgba(255,71,87,0.04)" stroke="rgba(255,71,87,0.18)" stroke-width="1"/>
+        <text x="980" y="604" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#ff4757">Resource Sharing</text>
+        
+        <rect x="920" y="637" width="120" height="26" rx="5" fill="rgba(255,71,87,0.04)" stroke="rgba(255,71,87,0.18)" stroke-width="1"/>
+        <text x="980" y="654" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#ff4757">Economy</text>
+        
+        <rect x="920" y="687" width="120" height="26" rx="5" fill="rgba(255,71,87,0.04)" stroke="rgba(255,71,87,0.18)" stroke-width="1"/>
+        <text x="980" y="704" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#ff4757">Scalability</text>
+
+        <ellipse cx="550" cy="640" rx="68" ry="28" fill="rgba(245,158,11,0.08)" stroke="rgba(245,158,11,0.4)" stroke-width="1.5"/>
+        <text x="550" y="636" text-anchor="middle" font-family="Orbitron,monospace" font-size="10" fill="#f59e0b" font-weight="700">Lifecycle</text>
+        <text x="550" y="652" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8888aa">State transitions</text>
+        
+        <rect x="320" y="707" width="100" height="26" rx="5" fill="rgba(245,158,11,0.04)" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <text x="370" y="724" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#f59e0b">New</text>
+        
+        <rect x="440" y="707" width="100" height="26" rx="5" fill="rgba(245,158,11,0.04)" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <text x="490" y="724" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#f59e0b">Runnable</text>
+        
+        <rect x="560" y="707" width="100" height="26" rx="5" fill="rgba(245,158,11,0.04)" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <text x="610" y="724" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#f59e0b">Blocked</text>
+        
+        <rect x="680" y="707" width="100" height="26" rx="5" fill="rgba(245,158,11,0.04)" stroke="rgba(245,158,11,0.18)" stroke-width="1"/>
+        <text x="730" y="724" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#f59e0b">Terminated</text>
+
+        <ellipse cx="250" cy="600" rx="65" ry="28" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.4)" stroke-width="1.5"/>
+        <text x="250" y="596" text-anchor="middle" font-family="Orbitron,monospace" font-size="9.5" fill="#8b5cf6" font-weight="700">Sync & Issues</text>
+        <text x="250" y="612" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8888aa">Concurrency</text>
+        
+        <rect x="60" y="527" width="120" height="26" rx="5" fill="rgba(139,92,246,0.04)" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <text x="120" y="544" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8b5cf6">Race Condition</text>
+        
+        <rect x="60" y="577" width="120" height="26" rx="5" fill="rgba(139,92,246,0.04)" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <text x="120" y="594" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8b5cf6">Deadlock</text>
+        
+        <rect x="60" y="627" width="120" height="26" rx="5" fill="rgba(139,92,246,0.04)" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <text x="120" y="644" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8b5cf6">Synchronization</text>
+        
+        <rect x="60" y="677" width="120" height="26" rx="5" fill="rgba(139,92,246,0.04)" stroke="rgba(139,92,246,0.18)" stroke-width="1"/>
+        <text x="120" y="694" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8b5cf6">Mutex/Semaphore</text>
+
+        <ellipse cx="200" cy="400" rx="62" ry="28" fill="rgba(16,217,140,0.08)" stroke="rgba(16,217,140,0.4)" stroke-width="1.5"/>
+        <text x="200" y="396" text-anchor="middle" font-family="Orbitron,monospace" font-size="9.5" fill="#10d98c" font-weight="700">vs Process</text>
+        <text x="200" y="412" text-anchor="middle" font-family="JetBrains Mono" font-size="7" fill="#8888aa">Key differences</text>
+        
+        <rect x="20" y="337" width="120" height="26" rx="6" fill="rgba(16,217,140,0.04)" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <text x="80" y="354" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#10d98c">Shared Memory</text>
+        
+        <rect x="20" y="437" width="120" height="26" rx="6" fill="rgba(16,217,140,0.04)" stroke="rgba(16,217,140,0.18)" stroke-width="1"/>
+        <text x="80" y="454" text-anchor="middle" font-family="JetBrains Mono" font-size="7.5" fill="#10d98c">Faster Ctx Switch</text>
+
+      </svg>
+      <p style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text3);margin-top:1rem">💡 Scroll left/right on mobile to explore the full mind map</p>
+    </div>
+  </div>
+</section>
+<div class="divider"></div>
+
+<!-- ============================================================ SIMULATORS -->
+<section id="simulator">
+  <div class="page-wrap">
+    <div class="section-header reveal">
+      <span class="section-tag">Chapter 05</span>
+      <h2 class="section-title">Interactive Simulators</h2>
+      <p class="section-sub">See threads in action — run the scheduler, trigger state transitions, and watch I/O blocking behavior unfold in real time.</p>
+    </div>
+
+    <!-- SIM 1: CPU Scheduler -->
+    <div class="sim-box reveal">
+      <div class="sim-toolbar">
+        <div class="sim-title">⚙️ Simulator 1 — CPU Round-Robin Scheduler</div>
+        <div class="sim-controls">
+          <button class="sbtn active" id="modelBtn" onclick="cycleModel()">Model: 1:1</button>
+          <button class="sbtn success" onclick="startSim()">▶ Run</button>
+          <button class="sbtn" onclick="pauseSim()">⏸ Pause</button>
+          <button class="sbtn danger" onclick="resetSim()">↺ Reset</button>
+          <button class="sbtn purple" onclick="addThread()">+ Thread</button>
+        </div>
+      </div>
+      <div class="sim-body">
+        <div class="sim-desc">
+          This simulator shows how the CPU scheduler assigns threads to CPU cores over time using Round-Robin scheduling. Change the threading model to see how many cores are used. Add threads to see how they compete for CPU time. <strong style="color:var(--accent)">The colored bars show each thread's progress, and the now-line moves right as time passes.</strong>
+        </div>
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-box-label">Time (ms)</div><div class="stat-box-val" id="simTime">0</div></div>
+          <div class="stat-box"><div class="stat-box-label">Active Threads</div><div class="stat-box-val" id="simTCount">3</div></div>
+          <div class="stat-box"><div class="stat-box-label">CPU Util.</div><div class="stat-box-val" id="simUtil">0%</div></div>
+          <div class="stat-box"><div class="stat-box-label">Context Switches</div><div class="stat-box-val" id="simCtx">0</div></div>
+          <div class="stat-box"><div class="stat-box-label">Completed</div><div class="stat-box-val" id="simDone">0/3</div></div>
+        </div>
+
+        <!-- CPU tracks -->
+        <div style="margin-bottom:1.25rem">
+          <div style="font-size:0.68rem;font-family:'JetBrains Mono',monospace;color:var(--text2);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.1em">CPU Execution Timeline</div>
+          <div class="gantt-row"><div class="gantt-label">CPU Core 1</div><div class="gantt-track" id="ct1"><div class="gantt-now" id="nl1" style="left:0%"></div></div></div>
+          <div class="gantt-row" id="core2row"><div class="gantt-label">CPU Core 2</div><div class="gantt-track" id="ct2"><div class="gantt-now" id="nl2" style="left:0%"></div></div></div>
+        </div>
+
+        <!-- Thread tracks -->
+        <div style="font-size:0.68rem;font-family:'JetBrains Mono',monospace;color:var(--text2);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.1em">Thread State Timeline</div>
+        <div id="threadTracks"></div>
+
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(0,240,255,0.7)"></div> Running</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,0.6)"></div> Ready/Queued</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(139,92,246,0.6)"></div> Waiting/Blocked</div>
+          <div class="legend-item"><div class="legend-dot" style="background:rgba(16,217,140,0.6)"></div> Completed</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIM 2: State Machine -->
+    <div class="sim-box reveal">
+      <div class="sim-toolbar">
+        <div class="sim-title">🔄 Simulator 2 — Thread State Machine</div>
+        <div class="sim-controls">
+          <button class="sbtn success" onclick="doEvent('start')">start()</button>
+          <button class="sbtn" onclick="doEvent('ioReq')">I/O Request</button>
+          <button class="sbtn" onclick="doEvent('ioDone')">I/O Done</button>
+          <button class="sbtn purple" onclick="doEvent('wait')">wait()</button>
+          <button class="sbtn purple" onclick="doEvent('notify')">notify()</button>
+          <button class="sbtn success" onclick="doEvent('exit')">exit()</button>
+          <button class="sbtn danger" onclick="doEvent('reset')">↺ Reset</button>
+        </div>
+      </div>
+      <div class="sim-body">
+        <div class="sim-desc">
+          Click the buttons to drive your thread through its lifecycle. The glowing node shows the current state. Try to reach TERMINATED — or trigger an invalid transition to see what happens!
+          <br><strong style="color:var(--accent)">Current State: <span id="curStateLabel" style="color:var(--accent3)">NEW</span></strong> &nbsp;|&nbsp;
+          <strong style="color:var(--text2)">Last event: <span id="lastEvtLabel" style="color:var(--accent2)">—</span></strong>
+        </div>
+        <svg viewBox="0 0 720 330" style="width:100%;max-height:330px;display:block;border-radius:10px;background:var(--bg3);border:1px solid var(--border)">
+          <defs>
+            <marker id="sm0" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="rgba(255,255,255,0.2)"/></marker>
+            <marker id="smR" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="rgba(255,71,87,0.6)"/></marker>
+            <marker id="smA" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="rgba(245,158,11,0.6)"/></marker>
+            <marker id="smP" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="rgba(139,92,246,0.6)"/></marker>
+            <marker id="smG" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 L8 3 L0 6 Z" fill="rgba(16,217,140,0.6)"/></marker>
+          </defs>
+          <!-- NEW -->
+          <rect id="sNEW" x="20" y="130" width="110" height="60" rx="14" fill="rgba(0,240,255,0.07)" stroke="rgba(0,240,255,0.4)" stroke-width="1.5"/>
+          <text x="75" y="158" text-anchor="middle" font-family="JetBrains Mono" font-size="13" fill="#00f0ff" font-weight="700">NEW</text>
+          <text x="75" y="176" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">created</text>
+          <!-- RUNNABLE -->
+          <rect id="sRUN" x="196" y="130" width="140" height="60" rx="14" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.4)" stroke-width="1.5"/>
+          <text x="266" y="158" text-anchor="middle" font-family="JetBrains Mono" font-size="13" fill="#f59e0b" font-weight="700">RUNNABLE</text>
+          <text x="266" y="176" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">ready / running</text>
+          <!-- BLOCKED -->
+          <rect id="sBLK" x="396" y="50" width="126" height="60" rx="14" fill="rgba(255,71,87,0.07)" stroke="rgba(255,71,87,0.4)" stroke-width="1.5"/>
+          <text x="459" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="13" fill="#ff4757" font-weight="700">BLOCKED</text>
+          <text x="459" y="96" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">I/O wait</text>
+          <!-- WAITING -->
+          <rect id="sWAIT" x="396" y="220" width="126" height="60" rx="14" fill="rgba(139,92,246,0.07)" stroke="rgba(139,92,246,0.4)" stroke-width="1.5"/>
+          <text x="459" y="248" text-anchor="middle" font-family="JetBrains Mono" font-size="13" fill="#8b5cf6" font-weight="700">WAITING</text>
+          <text x="459" y="266" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">wait() / sleep()</text>
+          <!-- TERMINATED -->
+          <rect id="sTERM" x="575" y="130" width="135" height="60" rx="14" fill="rgba(16,217,140,0.07)" stroke="rgba(16,217,140,0.4)" stroke-width="1.5"/>
+          <text x="642" y="155" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#10d98c" font-weight="700">TERMINATED</text>
+          <text x="642" y="173" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">done</text>
+          <!-- NEW → RUN -->
+          <line x1="130" y1="160" x2="196" y2="160" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" marker-end="url(#sm0)"/>
+          <text x="163" y="153" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8888aa">start()</text>
+          <!-- RUN → BLOCKED -->
+          <path d="M336 142 Q362 100 396 80" stroke="rgba(255,71,87,0.4)" stroke-width="1.5" fill="none" marker-end="url(#smR)"/>
+          <text x="355" y="100" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#ff4757">I/O request</text>
+          <!-- BLOCKED → RUN -->
+          <path d="M396 96 Q362 122 336 142" stroke="rgba(245,158,11,0.4)" stroke-width="1.5" fill="none" marker-end="url(#smA)"/>
+          <text x="345" y="136" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b">I/O done</text>
+          <!-- RUN → WAITING -->
+          <path d="M336 178 Q362 220 396 238" stroke="rgba(139,92,246,0.4)" stroke-width="1.5" fill="none" marker-end="url(#smP)"/>
+          <text x="355" y="226" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8b5cf6">wait()</text>
+          <!-- WAITING → RUN -->
+          <path d="M396 250 Q366 224 336 178" stroke="rgba(245,158,11,0.4)" stroke-width="1.5" fill="none" marker-end="url(#smA)"/>
+          <text x="345" y="205" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b">notify()</text>
+          <!-- RUN → TERM -->
+          <line x1="336" y1="160" x2="575" y2="160" stroke="rgba(16,217,140,0.3)" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#smG)"/>
+          <text x="455" y="153" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#10d98c">exit()</text>
+          <!-- Active indicator -->
+          <circle id="stateGlow" cx="75" cy="160" r="7" fill="rgba(0,240,255,0.8)">
+            <animate attributeName="r" values="7;12;7" dur="1.2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1.2s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+        <div class="sm-log" id="smLog">→ Thread created in NEW state. Press start() to begin execution.</div>
+      </div>
+    </div>
+
+    <!-- SIM 3: Blocking Comparison -->
+    <div class="sim-box reveal">
+      <div class="sim-toolbar">
+        <div class="sim-title">⚔️ Simulator 3 — I/O Blocking: Many-to-One vs One-to-One</div>
+        <div class="sim-controls">
+          <button class="sbtn success" onclick="startBlockSim()">▶ Simulate I/O Block</button>
+          <button class="sbtn danger" onclick="resetBlockSim(false)">↺ Reset</button>
+        </div>
+      </div>
+      <div class="sim-body">
+        <div class="sim-desc">
+          Watch what happens when <strong>Thread A</strong> makes an I/O system call in each threading model. This is the most important real-world difference between Many-to-One and One-to-One.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem">
+          <!-- Many-to-One side -->
+          <div>
+            <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--danger);margin-bottom:1rem;font-weight:700">❌ MANY-TO-ONE</div>
+            <div class="block-col" id="m2oSide">
+              <div class="thread-row-item"><div class="thread-wave" style="scale:0.7;transform-origin:left"><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text2)">Thread A</span><span class="badge badge-cyan" id="m2o0">RUNNING</span></div>
+              <div class="thread-row-item"><div class="thread-wave" style="scale:0.7;transform-origin:left"><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text2)">Thread B</span><span class="badge badge-cyan" id="m2o1">READY</span></div>
+              <div class="thread-row-item"><div class="thread-wave" style="scale:0.7;transform-origin:left"><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text2)">Thread C</span><span class="badge badge-cyan" id="m2o2">READY</span></div>
+              <div style="margin-top:0.75rem;padding:0.9rem;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+                <div style="font-size:0.65rem;font-family:'JetBrains Mono',monospace;color:var(--text2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.5rem">Kernel Thread</div>
+                <div style="display:flex;align-items:center;gap:0.75rem">
+                  <div style="width:38px;height:38px;border-radius:50%;background:rgba(139,92,246,0.15);border:2px solid var(--accent2);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:700;color:var(--accent2)" id="m2oK">K</div>
+                  <span class="badge badge-purple" id="m2oKs">ACTIVE</span>
+                </div>
+              </div>
+            </div>
+            <div id="m2oResult" style="margin-top:0.9rem;font-size:0.82rem;line-height:1.6;min-height:50px;color:var(--text2)"></div>
+          </div>
+          <!-- One-to-One side -->
+          <div>
+            <div style="text-align:center;font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--accent4);margin-bottom:1rem;font-weight:700">✅ ONE-TO-ONE</div>
+            <div class="block-col">
+              <div class="thread-row-item"><div class="thread-wave" style="scale:0.7;transform-origin:left"><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div><div class="ws" style="background:#00f0ff"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text2)">Thread A</span><span class="badge badge-cyan" id="o2o0">RUNNING</span><div style="width:26px;height:26px;border-radius:50%;background:rgba(139,92,246,0.15);border:1.5px solid var(--accent2);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:0.65rem;font-weight:700;color:var(--accent2)" id="ok0">K1</div></div>
+              <div class="thread-row-item"><div class="thread-wave" style="scale:0.7;transform-origin:left"><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div><div class="ws" style="background:#8b5cf6"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text2)">Thread B</span><span class="badge badge-cyan" id="o2o1">RUNNING</span><div style="width:26px;height:26px;border-radius:50%;background:rgba(139,92,246,0.15);border:1.5px solid var(--accent2);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:0.65rem;font-weight:700;color:var(--accent2)" id="ok1">K2</div></div>
+              <div class="thread-row-item"><div class="thread-wave" style="scale:0.7;transform-origin:left"><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div><div class="ws" style="background:#f59e0b"></div></div><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text2)">Thread C</span><span class="badge badge-cyan" id="o2o2">RUNNING</span><div style="width:26px;height:26px;border-radius:50%;background:rgba(139,92,246,0.15);border:1.5px solid var(--accent2);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:0.65rem;font-weight:700;color:var(--accent2)" id="ok2">K3</div></div>
+            </div>
+            <div id="o2oResult" style="margin-top:0.9rem;font-size:0.82rem;line-height:1.6;min-height:50px;color:var(--text2)"></div>
+          </div>
+        </div>
+        <div class="info-box ib-info" style="margin-top:1.5rem">
+          <span class="ib-icon">💡</span>
+          <div class="ib-body">Click <strong>"Simulate I/O Block"</strong> above. In Many-to-One: Thread A's I/O call blocks the single kernel thread → all three threads freeze. In One-to-One: Thread A blocks, but B and C have their own kernel threads and keep running.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ QUIZ -->
+<section id="quiz">
+  <div class="page-wrap">
+    <div class="section-header reveal">
+      <span class="section-tag">Chapter 06</span>
+      <h2 class="section-title">Test Your Knowledge</h2>
+      <p class="section-sub">15 questions covering everything from thread fundamentals to advanced concurrency models.</p>
+    </div>
+    <div class="quiz-wrap reveal">
+      <div id="quizMain">
+        <div class="quiz-top">
+          <span class="quiz-prog-label" id="qProgLabel">Question 1 of 15</span>
+          <span class="quiz-score-lbl">Score: <span id="qScore">0</span></span>
+        </div>
+        <div class="quiz-bar"><div class="quiz-fill" id="qFill" style="width:6.67%"></div></div>
+        <div class="quiz-q" id="qText"></div>
+        <div class="quiz-opts" id="qOpts"></div>
+        <div class="quiz-fb" id="qFb"></div>
+        <div class="quiz-nav"><button class="sbtn success" id="qNext" onclick="nextQ()" style="display:none">Next Question →</button></div>
+      </div>
+      <div id="quizEnd" style="display:none" class="quiz-score-screen">
+        <div class="score-big" id="finalScore">0/15</div>
+        <div style="font-size:1.1rem;color:var(--text2);margin:1rem 0" id="scoreMsg"></div>
+        <button class="btn-primary" onclick="restartQuiz()">Try Again</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ============================================================ CHALLENGES -->
+<section id="challenges">
+  <div class="page-wrap">
+    <div class="section-header reveal">
+      <span class="section-tag">Chapter 07</span>
+      <h2 class="section-title">Coding Challenges</h2>
+      <p class="section-sub">Apply your knowledge to real problems — from thread creation to deadlock detection.</p>
+    </div>
+    <div class="challenges-grid">
+      <div class="chal-card reveal rd1">
+        <div class="chal-head"><span style="font-weight:700;font-size:0.9rem">🧵 Thread Creation</span><span class="diff diff-e">Easy</span></div>
+        <div class="chal-body">
+          <div class="chal-title">Create a Multithreaded Counter</div>
+          <div class="chal-desc">Create 3 threads that each print numbers 1-5. Observe the interleaved output — this shows concurrency in action.</div>
+          <div class="code-pre"><span class="code-kw">import</span> threading
+
+<span class="code-kw">def</span> <span class="fn">print_nums</span>(tid):
+    <span class="code-kw">for</span> i <span class="code-kw">in</span> range(<span class="code-n">1</span>, <span class="code-n">6</span>):
+        print(<span class="code-str">f"T{tid}: {i}"</span>)
+
+<span class="code-cm"># TODO: Create 3 threads, start them, join them</span>
+threads = []
+<span class="code-kw">for</span> i <span class="code-kw">in</span> range(<span class="code-n">3</span>):
+    t = threading.Thread(target=___, args=(i,))
+    threads.append(t)
+    ___.<span class="fn">start</span>()</div>
+          <button class="sbtn success" onclick="toggleSol('s0')">Show Solution ▾</button>
+          <div id="s0" style="display:none;margin-top:0.7rem"><div class="code-pre" style="border-color:rgba(16,217,140,0.3)"><span class="code-kw">for</span> i <span class="code-kw">in</span> range(<span class="code-n">3</span>):
+    t = threading.Thread(target=print_nums, args=(i,))
+    threads.append(t); t.<span class="fn">start</span>()
+<span class="code-kw">for</span> t <span class="code-kw">in</span> threads: t.<span class="fn">join</span>()  <span class="code-cm"># wait for all ✓</span></div></div>
+        </div>
+      </div>
+
+      <div class="chal-card reveal rd2">
+        <div class="chal-head"><span style="font-weight:700;font-size:0.9rem">🔒 Race Condition Fix</span><span class="diff diff-m">Medium</span></div>
+        <div class="chal-body">
+          <div class="chal-title">Fix the Race Condition</div>
+          <div class="chal-desc">This code produces wrong results due to a race condition. Add a mutex to fix it — the answer should always be exactly 500,000.</div>
+          <div class="code-pre">counter = <span class="code-n">0</span>
+<span class="code-cm"># ❌ Race condition — NOT atomic!</span>
+<span class="code-kw">def</span> <span class="fn">increment</span>():
+    <span class="code-kw">global</span> counter
+    <span class="code-kw">for</span> _ <span class="code-kw">in</span> range(<span class="code-n">100000</span>):
+        counter += <span class="code-n">1</span>  <span class="code-cm"># 3 steps: read, +1, write</span>
+
+threads = [threading.Thread(target=increment)
+           <span class="code-kw">for</span> _ <span class="code-kw">in</span> range(<span class="code-n">5</span>)]</div>
+          <button class="sbtn success" onclick="toggleSol('s1')">Show Solution ▾</button>
+          <div id="s1" style="display:none;margin-top:0.7rem"><div class="code-pre" style="border-color:rgba(16,217,140,0.3)">lock = threading.Lock()
+<span class="code-kw">def</span> <span class="fn">safe_increment</span>():
+    <span class="code-kw">global</span> counter
+    <span class="code-kw">for</span> _ <span class="code-kw">in</span> range(<span class="code-n">100000</span>):
+        <span class="code-kw">with</span> lock:  <span class="code-cm"># acquire on enter, release on exit</span>
+            counter += <span class="code-n">1</span>
+<span class="code-cm"># Always 500000 ✓</span></div></div>
+        </div>
+      </div>
+
+      <div class="chal-card reveal rd3">
+        <div class="chal-head"><span style="font-weight:700;font-size:0.9rem">🍽️ Classic Problem</span><span class="diff diff-h">Hard</span></div>
+        <div class="chal-body">
+          <div class="chal-title">Dining Philosophers</div>
+          <div class="chal-desc">5 philosophers need 2 forks to eat. Implement a deadlock-free solution using semaphores and the asymmetric approach.</div>
+          <div class="code-pre">N = <span class="code-n">5</span>
+forks = [threading.Semaphore(<span class="code-n">1</span>) <span class="code-kw">for</span> _ <span class="code-kw">in</span> range(N)]
+
+<span class="code-kw">def</span> <span class="fn">philosopher</span>(i):
+    left, right = forks[i], forks[(i+<span class="code-n">1</span>)%N]
+    <span class="code-cm"># TODO: think → pick forks → eat → release</span>
+    <span class="code-cm"># Hint: odd philosophers pick RIGHT first!</span>
+    ...</div>
+          <button class="sbtn success" onclick="toggleSol('s2')">Show Solution ▾</button>
+          <div id="s2" style="display:none;margin-top:0.7rem"><div class="code-pre" style="border-color:rgba(16,217,140,0.3)"><span class="code-kw">def</span> <span class="fn">philosopher</span>(i):
+    left, right = forks[i], forks[(i+<span class="code-n">1</span>)%N]
+    <span class="code-kw">while</span> True:
+        time.sleep(<span class="code-n">0.1</span>)  <span class="code-cm"># think</span>
+        <span class="code-cm"># Asymmetric: even=left first, odd=right first</span>
+        f, s = (left,right) <span class="code-kw">if</span> i%<span class="code-n">2</span>==<span class="code-n">0</span> <span class="code-kw">else</span> (right,left)
+        f.acquire(); s.acquire()
+        time.sleep(<span class="code-n">0.1</span>)  <span class="code-cm"># eat</span>
+        s.release(); f.release()  <span class="code-cm"># ✓ no deadlock</span></div></div>
+        </div>
+      </div>
+
+      <div class="chal-card reveal rd4">
+        <div class="chal-head"><span style="font-weight:700;font-size:0.9rem">🔍 Deadlock Detection</span><span class="diff diff-h">Hard</span></div>
+        <div class="chal-body">
+          <div class="chal-title">Find & Fix the Deadlock</div>
+          <div class="chal-desc">Identify the circular wait in this code and apply the lock-ordering fix to break the deadlock cycle.</div>
+          <div class="code-pre">lock_A = threading.Lock()
+lock_B = threading.Lock()
+
+<span class="code-kw">def</span> <span class="fn">thread1</span>():
+    lock_A.<span class="fn">acquire</span>(); time.sleep(<span class="code-n">0.05</span>)
+    lock_B.<span class="fn">acquire</span>()  <span class="code-cm"># waits for B…</span>
+    lock_B.release(); lock_A.release()
+
+<span class="code-kw">def</span> <span class="fn">thread2</span>():
+    lock_B.<span class="fn">acquire</span>(); time.sleep(<span class="code-n">0.05</span>)
+    lock_A.<span class="fn">acquire</span>()  <span class="code-cm"># waits for A → DEADLOCK!</span></div>
+          <button class="sbtn success" onclick="toggleSol('s3')">Show Fix ▾</button>
+          <div id="s3" style="display:none;margin-top:0.7rem"><div class="code-pre" style="border-color:rgba(16,217,140,0.3)"><span class="code-cm"># Fix: always acquire in same order (A before B)</span>
+<span class="code-kw">def</span> <span class="fn">thread2_fixed</span>():
+    lock_A.<span class="fn">acquire</span>()  <span class="code-cm"># A first ← same as thread1</span>
+    time.sleep(<span class="code-n">0.05</span>)
+    lock_B.<span class="fn">acquire</span>()  <span class="code-cm"># B second</span>
+    lock_B.release(); lock_A.release()
+<span class="code-cm"># No circular wait → no deadlock ✓</span></div></div>
+        </div>
+      </div>
+
+      <div class="chal-card reveal">
+        <div class="chal-head"><span style="font-weight:700;font-size:0.9rem">🏊 Thread Pool</span><span class="diff diff-m">Medium</span></div>
+        <div class="chal-body">
+          <div class="chal-title">Build a Thread Pool (M:M in practice)</div>
+          <div class="chal-desc">Thread pools are the real-world implementation of Many-to-Many — N tasks run on M worker threads. This eliminates the cost of repeated thread creation.</div>
+          <div class="code-pre"><span class="code-kw">from</span> concurrent.futures <span class="code-kw">import</span> ThreadPoolExecutor
+
+<span class="code-kw">def</span> <span class="fn">task</span>(id):
+    time.sleep(<span class="code-n">0.1</span>)
+    <span class="code-kw">return</span> id * id
+
+<span class="code-cm"># 10 tasks, 4 worker threads (Many-to-Many!)</span>
+<span class="code-kw">with</span> ThreadPoolExecutor(max_workers=<span class="code-n">4</span>) <span class="code-kw">as</span> pool:
+    futures = [pool.submit(task, i) <span class="code-kw">for</span> i <span class="code-kw">in</span> range(<span class="code-n">10</span>)]
+    results = [f.result() <span class="code-kw">for</span> f <span class="code-kw">in</span> futures]
+print(results)  <span class="code-cm"># [0,1,4,9,16,25,36,49,64,81]</span></div>
+          <div class="info-box ib-info" style="margin-top:0.7rem"><span class="ib-icon">💡</span><div class="ib-body">This is the <strong>Many-to-Many model in action</strong> — 10 tasks mapped to 4 threads. The pool scheduler manages assignment, just like an OS schedules threads to cores.</div></div>
+        </div>
+      </div>
+
+      <div class="chal-card reveal">
+        <div class="chal-head"><span style="font-weight:700;font-size:0.9rem">🧠 Model Selection</span><span class="diff diff-e">Conceptual</span></div>
+        <div class="chal-body">
+          <div class="chal-title">Which Model Would You Choose?</div>
+          <div class="chal-desc">For each scenario, select the best threading model and justify your choice.</div>
+          <div style="display:flex;flex-direction:column;gap:0.8rem;margin-top:0.5rem">
+            <div style="padding:0.85rem;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent)">
+              <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.3rem">Scenario A: High-traffic Web Server</div>
+              <div style="font-size:0.78rem;color:var(--text2)">10,000 concurrent connections on a 16-core machine. Each request may block on DB or I/O.</div>
+              <div style="font-size:0.75rem;color:var(--accent);margin-top:0.4rem">✓ Answer: One-to-One — true parallelism, isolated I/O blocking per request</div>
+            </div>
+            <div style="padding:0.85rem;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent2)">
+              <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.3rem">Scenario B: Lightweight Game Coroutines</div>
+              <div style="font-size:0.78rem;color:var(--text2)">Hundreds of AI agent behaviors, cooperatively yielding. Single-thread rendering loop.</div>
+              <div style="font-size:0.75rem;color:var(--accent2);margin-top:0.4rem">✓ Answer: Many-to-One — very fast user-space switching, no kernel overhead needed</div>
+            </div>
+            <div style="padding:0.85rem;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent3)">
+              <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.3rem">Scenario C: Real-time Financial System</div>
+              <div style="font-size:0.78rem;color:var(--text2)">Critical transaction threads need guaranteed CPU time; background analytics can share.</div>
+              <div style="font-size:0.75rem;color:var(--accent3);margin-top:0.4rem">✓ Answer: Two-Level — bind critical threads 1:1, pool background tasks M:M</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ FOOTER -->
+<footer>
+  <div class="footer-logo">Thread<span>OS</span></div>
+  <div class="footer-sub">Complete interactive guide to Threads, Concurrency & Multithreading Models · Operating Systems</div>
+</footer>
+
+<!-- ============================================================ JAVASCRIPT -->
+<script>
+// ============================================================ SCROLL PROGRESS & NAV
+window.addEventListener('scroll', () => {
+  const pct = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
+  document.getElementById('navProgress').style.width = pct + '%';
+  // Active nav link
+  const ids = ['home','concepts','sync','models','mindmap','simulator','quiz','challenges'];
+  let cur = 'home';
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && window.scrollY >= el.offsetTop - 90) cur = id;
+  });
+  document.querySelectorAll('.nav-links a').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
+  });
+});
+
+// ============================================================ PARTICLES
+const pc = document.getElementById('particles');
+const clrs = ['#00f0ff','#8b5cf6','#f59e0b','#10d98c'];
+for (let i = 0; i < 22; i++) {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.style.cssText = `left:${Math.random()*100}%;height:${40+Math.random()*60}px;background:${clrs[i%4]};animation-duration:${6+Math.random()*8}s;animation-delay:${Math.random()*8}s;`;
+  pc.appendChild(p);
+}
+
+// ============================================================ SCROLL REVEAL
+const revIO = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); });
+}, { threshold: 0.08 });
+document.querySelectorAll('.reveal').forEach(r => revIO.observe(r));
+
+// ============================================================ COUNTER ANIMATION
+document.querySelectorAll('[data-count]').forEach(el => {
+  const t = +el.getAttribute('data-count');
+  let c = 0; const step = Math.max(1, Math.ceil(t / 35));
+  const tm = setInterval(() => { c = Math.min(c + step, t); el.textContent = c; if (c >= t) clearInterval(tm); }, 40);
+});
+
+// ============================================================ WAVE OFFSETS
+document.querySelectorAll('.thread-wave').forEach((w, wi) => {
+  w.querySelectorAll('.ws').forEach((s, si) => { s.style.animationDelay = `${wi*0.28+si*0.11}s`; });
+});
+
+// ============================================================ SIMULATOR 1 — SCHEDULER
+let simRunning = false, simPaused = false, simInterval = null, simTick = 0;
+let simModel = '1:1', modelCycle = ['1:1','M:1','M:M'], modelIdx = 0;
+let ctxSwitches = 0;
+const tColors = ['#00f0ff','#8b5cf6','#f59e0b','#10d98c','#ff4757'];
+const tNames = ['T-Alpha','T-Beta','T-Gamma','T-Delta','T-Epsilon'];
+let threads = [
+  {name:'T-Alpha',color:'#00f0ff',state:'ready',burst:30,done:false},
+  {name:'T-Beta', color:'#8b5cf6',state:'ready',burst:22,done:false},
+  {name:'T-Gamma',color:'#f59e0b',state:'ready',burst:26,done:false},
+];
+
+function renderTracks() {
+  const area = document.getElementById('threadTracks');
+  area.innerHTML = '';
+  threads.forEach((t,i) => {
+    const row = document.createElement('div');
+    row.className = 'gantt-row';
+    row.innerHTML = `<div class="gantt-label">${t.name}</div><div class="gantt-track" id="tt${i}" style="border-color:${t.color}30"><div class="gantt-block" id="tb${i}" style="left:0%;width:0%;background:${t.color}20;color:${t.color};border:1px solid ${t.color}44">READY</div></div>`;
+    area.appendChild(row);
+  });
+}
+renderTracks();
+
+function cycleModel() {
+  modelIdx = (modelIdx+1) % modelCycle.length;
+  simModel = modelCycle[modelIdx];
+  document.getElementById('modelBtn').textContent = 'Model: '+simModel;
+  document.getElementById('core2row').style.display = simModel === 'M:1' ? 'none' : 'flex';
+  resetSim();
+}
+
+function startSim() {
+  if (simRunning) return;
+  simRunning = true; simPaused = false; simTick = 0; ctxSwitches = 0;
+  threads.forEach(t => { t.state='ready'; t.burst = 20+Math.floor(Math.random()*20); t.done=false; });
+  renderTracks();
+  const maxCores = simModel === 'M:1' ? 1 : 2;
+  const totalTicks = 80;
+
+  simInterval = setInterval(() => {
+    if (simPaused) return;
+    simTick++;
+    const time = simTick * 50;
+    document.getElementById('simTime').textContent = time;
+    document.getElementById('simCtx').textContent = ctxSwitches;
+
+    // Round-robin: assign active threads to cores
+    const active = threads.filter(t => !t.done);
+    const prev = threads.filter(t => t.state === 'running');
+    threads.forEach(t => { if (!t.done && t.state === 'running') t.state = 'ready'; });
+
+    let assigned = 0;
+    active.forEach((t) => {
+      if (t.done) return;
+      if (assigned < maxCores) {
+        if (t.state !== 'running') ctxSwitches++;
+        t.state = 'running'; t.burst--;
+        if (t.burst <= 0) { t.state = 'done'; t.done = true; }
+        assigned++;
+      } else {
+        t.state = 'ready';
+      }
+    });
+
+    const running = threads.filter(t => t.state === 'running').length;
+    const done = threads.filter(t => t.done).length;
+    document.getElementById('simTCount').textContent = threads.filter(t => !t.done).length;
+    document.getElementById('simUtil').textContent = Math.round((running/maxCores)*100)+'%';
+    document.getElementById('simDone').textContent = done+'/'+threads.length;
+
+    const pct = Math.min(100, (simTick/totalTicks)*100);
+    ['nl1','nl2'].forEach(id => { const el=document.getElementById(id); if(el) el.style.left=pct+'%'; });
+
+    threads.forEach((t,i) => {
+      const b = document.getElementById('tb'+i); if (!b) return;
+      const stateColors = {running:t.color+'aa',ready:t.color+'33',done:'#10d98c55'};
+      const w = Math.min(100,(simTick/totalTicks)*100);
+      b.style.background = stateColors[t.done?'done':t.state] || '#ffffff10';
+      b.style.width = (t.done ? w : w - 5) + '%';
+      b.textContent = t.done ? 'DONE' : t.state.toUpperCase();
+      b.style.color = t.done ? '#10d98c' : t.color;
+    });
+
+    if (threads.every(t => t.done) || simTick >= totalTicks) {
+      clearInterval(simInterval); simRunning = false;
+      document.getElementById('simUtil').textContent = '100%';
+    }
+  }, 180);
+}
+
+function pauseSim() { simPaused = !simPaused; }
+
+function resetSim() {
+  clearInterval(simInterval); simRunning = false; simPaused = false; simTick = 0; ctxSwitches = 0;
+  ['simTime','simCtx'].forEach(id => document.getElementById(id).textContent = '0');
+  document.getElementById('simUtil').textContent = '0%';
+  document.getElementById('simDone').textContent = '0/'+threads.length;
+  ['nl1','nl2'].forEach(id => { const el=document.getElementById(id); if(el) el.style.left='0%'; });
+  threads = [
+    {name:'T-Alpha',color:'#00f0ff',state:'ready',burst:30,done:false},
+    {name:'T-Beta', color:'#8b5cf6',state:'ready',burst:22,done:false},
+    {name:'T-Gamma',color:'#f59e0b',state:'ready',burst:26,done:false},
+  ];
+  renderTracks();
+  document.getElementById('simTCount').textContent = '3';
+}
+
+function addThread() {
+  if (threads.length >= 5) return;
+  const i = threads.length;
+  threads.push({name:tNames[i],color:tColors[i],state:'ready',burst:15+Math.floor(Math.random()*18),done:false});
+  renderTracks();
+  document.getElementById('simTCount').textContent = threads.filter(t=>!t.done).length;
+  document.getElementById('simDone').textContent = '0/'+threads.length;
+}
+
+// ============================================================ SIMULATOR 2 — STATE MACHINE
+const smStates = {
+  NEW:{x:75,y:160},RUNNABLE:{x:266,y:160},BLOCKED:{x:459,y:80},WAITING:{x:459,y:250},TERMINATED:{x:642,y:160}
+};
+const smColors = {NEW:'#00f0ff',RUNNABLE:'#f59e0b',BLOCKED:'#ff4757',WAITING:'#8b5cf6',TERMINATED:'#10d98c'};
+const smBoxIds = {NEW:'sNEW',RUNNABLE:'sRUN',BLOCKED:'sBLK',WAITING:'sWAIT',TERMINATED:'sTERM'};
+const smTransitions = {
+  NEW:{start:'RUNNABLE'},
+  RUNNABLE:{ioReq:'BLOCKED',wait:'WAITING',exit:'TERMINATED'},
+  BLOCKED:{ioDone:'RUNNABLE'},
+  WAITING:{notify:'RUNNABLE'},
+  TERMINATED:{}
+};
+const smLogs = {
+  start:'Thread called start() → entering RUNNABLE state. Waiting for CPU time.',
+  ioReq:'Thread made a system I/O call → moves to BLOCKED state. Cannot run until I/O completes.',
+  ioDone:'I/O operation completed → thread returns to RUNNABLE state. Ready for CPU again.',
+  wait:'Thread called wait() → enters WAITING state. Sleeping until another thread calls notify().',
+  notify:'Thread received notify() signal → back to RUNNABLE state. Competing for CPU again.',
+  exit:'Thread run() method returned → TERMINATED. No further transitions possible.',
+  reset:'Thread reset to initial NEW state.',
+};
+let curState = 'NEW';
+
+function highlightSM(state) {
+  Object.keys(smBoxIds).forEach(s => {
+    const el = document.getElementById(smBoxIds[s]);
+    if (!el) return;
+    el.style.filter = s===state ? `drop-shadow(0 0 10px ${smColors[s]})` : 'none';
+    el.style.opacity = s===state ? '1' : '0.5';
+  });
+  const glow = document.getElementById('stateGlow');
+  const pos = smStates[state];
+  if (glow && pos) {
+    glow.setAttribute('cx', pos.x); glow.setAttribute('cy', pos.y);
+    glow.style.fill = smColors[state];
+  }
+}
+highlightSM('NEW');
+
+function doEvent(evt) {
+  if (evt === 'reset') {
+    curState = 'NEW';
+    document.getElementById('curStateLabel').textContent = 'NEW';
+    document.getElementById('curStateLabel').style.color = '#f59e0b';
+    document.getElementById('lastEvtLabel').textContent = 'reset';
+    document.getElementById('smLog').textContent = '→ '+smLogs.reset;
+    highlightSM('NEW'); return;
+  }
+  const avail = smTransitions[curState];
+  if (!avail || !avail[evt]) {
+    document.getElementById('smLog').textContent = `→ ❌ Cannot call '${evt}' from ${curState} state. This transition does not exist.`;
+    return;
+  }
+  curState = avail[evt];
+  const c = smColors[curState];
+  document.getElementById('curStateLabel').textContent = curState;
+  document.getElementById('curStateLabel').style.color = c;
+  document.getElementById('lastEvtLabel').textContent = evt+'()';
+  document.getElementById('smLog').textContent = '→ '+smLogs[evt];
+  highlightSM(curState);
+}
+
+// ============================================================ SIMULATOR 3 — BLOCKING
+let blockRunning = false;
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function startBlockSim() {
+  if (blockRunning) return;
+  blockRunning = true;
+  resetBlockSim(true);
+  await sleep(300);
+
+  // Thread A makes I/O call
+  setBadge('m2o0','I/O CALL','badge-amber');
+  setBadge('o2o0','I/O CALL','badge-amber');
+  await sleep(900);
+
+  // Many-to-One: ALL block
+  ['m2o0','m2o1','m2o2'].forEach(id => setBadge(id,'BLOCKED','badge-red'));
+  setBadge('m2oKs','BLOCKED','badge-red');
+  document.getElementById('m2oResult').innerHTML = '<strong style="color:var(--danger)">❌ Thread A I/O blocked the single kernel thread!</strong><br>Threads B and C are also stuck — they cannot execute even though they have no I/O to do. This is the critical flaw of Many-to-One.';
+
+  // One-to-One: only A blocks
+  setBadge('o2o0','BLOCKED','badge-red');
+  setBadge('o2o1','RUNNING','badge-green');
+  setBadge('o2o2','RUNNING','badge-green');
+  document.getElementById('o2oResult').innerHTML = '<strong style="color:var(--accent4)">✅ Only Thread A is blocked!</strong><br>Threads B and C have their own kernel threads (K2, K3) and continue executing in parallel. This is why One-to-One dominates in modern OSes.';
+
+  await sleep(3000);
+
+  // Unblock
+  ['m2o0','m2o1','m2o2'].forEach(id => setBadge(id,'RUNNING','badge-cyan'));
+  setBadge('m2oKs','ACTIVE','badge-purple');
+  setBadge('o2o0','RUNNING','badge-cyan');
+  document.getElementById('m2oResult').innerHTML += '<br><strong style="color:var(--accent3)">⏱ I/O complete — threads resume, but time was wasted.</strong> Total time lost = I/O wait × all threads.';
+  blockRunning = false;
+}
+
+function setBadge(id, text, cls) {
+  const el = document.getElementById(id); if (!el) return;
+  el.textContent = text; el.className = 'badge '+cls;
+}
+
+function resetBlockSim(soft) {
+  blockRunning = false;
+  setBadge('m2o0','RUNNING','badge-cyan');
+  setBadge('m2o1','READY','badge-cyan');
+  setBadge('m2o2','READY','badge-cyan');
+  setBadge('m2oKs','ACTIVE','badge-purple');
+  ['o2o0','o2o1','o2o2'].forEach(id => setBadge(id,'RUNNING','badge-cyan'));
+  if (!soft) {
+    document.getElementById('m2oResult').textContent = '';
+    document.getElementById('o2oResult').textContent = '';
+  }
+}
+
+// ============================================================ QUIZ
+const quizData = [
+  {q:"What is a thread also known as?",opts:["Heavy process","Lightweight process","Virtual process","Super process"],ans:1,exp:"A thread is called a 'lightweight process' because it shares its process's code, data, and files — making it far lighter than forking a full process."},
+  {q:"What does each thread have exclusively (NOT shared with other threads)?",opts:["Code segment","Data segment","Stack and registers","File descriptors"],ans:2,exp:"Each thread has its own private stack and registers (including Program Counter). Code, data, and files are shared among all threads in the same process."},
+  {q:"In the Many-to-One model, what happens when one thread makes a blocking I/O call?",opts:["Only that thread blocks","All threads in the process block","The kernel creates a new thread","The process terminates immediately"],ans:1,exp:"Many-to-One uses a single kernel thread for all user threads. If that kernel thread blocks on I/O, the entire kernel thread is blocked — meaning ALL user threads are frozen."},
+  {q:"Which threading model is used by Linux and Windows today?",opts:["Many-to-One","Many-to-Many","One-to-One","Two-Level"],ans:2,exp:"Linux (via pthreads) and Windows use the One-to-One model — each user thread maps directly to its own kernel thread, enabling true parallelism on multicore systems."},
+  {q:"Which of these is NOT one of the 4 advantages of multithreading?",opts:["Responsiveness","Resource sharing","Economy","Memory isolation"],ans:3,exp:"The four classic advantages are Responsiveness, Resource Sharing, Economy, and Scalability. Memory isolation is actually a feature of processes — threads intentionally share memory!"},
+  {q:"What is the Program Counter (PC) used for?",opts:["Counts number of running programs","Stores address of the next instruction to execute","Tracks total memory usage","Counts context switches"],ans:1,exp:"The Program Counter is a CPU register that stores the memory address of the next instruction to execute. Each thread has its own PC — that's how they execute independently."},
+  {q:"Solaris Green Threads uses which multithreading model?",opts:["One-to-One","Many-to-Many","Two-Level","Many-to-One"],ans:3,exp:"Solaris Green Threads is a classic example of the Many-to-One model — many user-space green threads are multiplexed onto a single kernel thread."},
+  {q:"What is the Two-Level model?",opts:["One-to-One with double buffering","Many-to-One with load balancing","Many-to-Many with optional bound thread support","Pure kernel scheduling"],ans:2,exp:"The Two-Level model is Many-to-Many plus the ability to 'bind' a specific user thread permanently to a kernel thread (1:1 binding) for time-critical operations."},
+  {q:"Which model provides NO parallelism even on a multicore CPU?",opts:["One-to-One","Many-to-Many","Two-Level","Many-to-One"],ans:3,exp:"Many-to-One uses a single kernel thread for all user threads. Even on a 64-core machine, only one thread can be in kernel space at a time — no true parallelism."},
+  {q:"What is a race condition?",opts:["A programming contest","Outcome depends on thread execution timing — shared data modified without synchronization","A thread running faster than others","Two threads sleeping at the same time"],ans:1,exp:"A race condition occurs when the outcome of a computation depends on the relative timing of thread execution. Multiple threads access shared data simultaneously without proper synchronization, causing unpredictable results."},
+  {q:"Which statement about deadlock is correct?",opts:["Deadlock requires only one condition to occur","All four conditions (mutual exclusion, hold-and-wait, no preemption, circular wait) must hold simultaneously","Deadlock is caused by too many threads","Deadlock only occurs in Many-to-One model"],ans:1,exp:"Deadlock requires ALL four conditions simultaneously: mutual exclusion, hold-and-wait, no preemption, and circular wait. Eliminating any ONE condition prevents deadlock."},
+  {q:"HP-UX, IRIX, and Tru64 UNIX use which threading model?",opts:["Many-to-One","One-to-One","Many-to-Many","Two-Level"],ans:3,exp:"HP-UX, IRIX, Tru64 UNIX, and Solaris 8 and earlier all implemented the Two-Level model — combining Many-to-Many flexibility with optional thread-to-kernel-thread binding."},
+  {q:"Why are threads cheaper to create than processes?",opts:["They run in a separate CPU mode","They share the process address space — no need to duplicate memory","They don't require any OS interaction","They use compressed memory"],ans:1,exp:"Creating a thread only requires allocating a stack and thread control block. A process creation requires duplicating the entire address space, file table, etc. Thread creation is approximately 30x faster."},
+  {q:"A mutex is used to...",opts:["Make threads run faster","Ensure only one thread accesses a critical section at a time","Increase CPU utilization","Create new threads automatically"],ans:1,exp:"A mutex (mutual exclusion lock) ensures that only ONE thread can execute a critical section at a time. Other threads block at the lock acquisition until the current holder releases it."},
+  {q:"When a thread calls wait(), what state does it enter?",opts:["BLOCKED","TERMINATED","WAITING","RUNNABLE"],ans:2,exp:"wait() puts a thread in the WAITING state — it sleeps until another thread calls notify() or notifyAll(). BLOCKED is specifically for threads waiting for I/O or system resources (a distinct state)."},
+];
+
+let curQ = 0, qScore = 0, answered = false;
+
+function loadQ() {
+  const d = quizData[curQ];
+  document.getElementById('qProgLabel').textContent = `Question ${curQ+1} of ${quizData.length}`;
+  document.getElementById('qFill').style.width = `${((curQ+1)/quizData.length)*100}%`;
+  document.getElementById('qText').textContent = d.q;
+  const opts = document.getElementById('qOpts');
+  opts.innerHTML = '';
+  ['A','B','C','D'].forEach((l,i) => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-opt';
+    btn.innerHTML = `<span class="opt-letter">${l}</span>${d.opts[i]}`;
+    btn.onclick = () => selectOpt(i);
+    opts.appendChild(btn);
+  });
+  document.getElementById('qFb').className = 'quiz-fb';
+  document.getElementById('qFb').innerHTML = '';
+  document.getElementById('qNext').style.display = 'none';
+  answered = false;
+}
+
+function selectOpt(idx) {
+  if (answered) return;
+  answered = true;
+  const d = quizData[curQ];
+  document.querySelectorAll('.quiz-opt').forEach((o,i) => {
+    o.classList.add('disabled');
+    if (i === d.ans) o.classList.add('correct');
+    else if (i === idx) o.classList.add('wrong');
+  });
+  const fb = document.getElementById('qFb');
+  if (idx === d.ans) {
+    qScore++;
+    document.getElementById('qScore').textContent = qScore;
+    fb.className = 'quiz-fb correct show';
+    fb.innerHTML = `✅ Correct! ${d.exp}`;
+  } else {
+    fb.className = 'quiz-fb wrong show';
+    fb.innerHTML = `❌ Not quite. ${d.exp}`;
+  }
+  document.getElementById('qNext').style.display = 'inline-block';
+}
+
+function nextQ() {
+  curQ++;
+  if (curQ >= quizData.length) {
+    document.getElementById('quizMain').style.display = 'none';
+    document.getElementById('quizEnd').style.display = 'block';
+    document.getElementById('finalScore').textContent = `${qScore}/${quizData.length}`;
+    const pct = qScore/quizData.length*100;
+    document.getElementById('scoreMsg').textContent = pct>=90?'🏆 Outstanding! Thread master!':pct>=70?'⭐ Great job! Solid understanding.':pct>=50?'📚 Good effort! Review models & sync sections.':'💪 Keep studying! Re-read the concepts and try again.';
+  } else loadQ();
+}
+
+function restartQuiz() {
+  curQ = 0; qScore = 0;
+  document.getElementById('qScore').textContent = 0;
+  document.getElementById('quizMain').style.display = 'block';
+  document.getElementById('quizEnd').style.display = 'none';
+  loadQ();
+}
+loadQ();
+
+// ============================================================ SOLUTIONS
+function toggleSol(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+</body>
+</html>
