@@ -524,6 +524,7 @@ footer{border-top:1px solid var(--border);padding:2.5rem 2rem;text-align:center;
     <li><a href="#simulator">Simulator</a></li>
     <li><a href="#quiz">Quiz</a></li>
     <li><a href="#challenges">Challenges</a></li>
+    <li><a href="#ipc" style="color:var(--accent3)">IPC</a></li>
   </ul>
 </nav>
 <div class="nav-progress" id="navProgress"></div>
@@ -1747,6 +1748,559 @@ print(results)  <span class="code-cm"># [0,1,4,9,16,25,36,49,64,81]</span></div>
   </div>
 </section>
 
+<!-- ============================================================ IPC SECTION -->
+<div class="divider"></div>
+<section id="ipc">
+<div class="page-wrap">
+
+  <!-- Header -->
+  <div class="section-header reveal">
+    <span class="section-tag">Chapter 09 — New</span>
+    <h2 class="section-title">Inter-Process <span style="background:linear-gradient(135deg,var(--accent3),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Communication</span></h2>
+    <p class="section-sub">How processes talk to each other — the backbone of every multi-tasking operating system. Master shared memory, message passing, synchronization and buffering.</p>
+  </div>
+
+  <!-- What is IPC? -->
+  <div class="grid-4 reveal" style="margin-bottom:3rem">
+    <div class="card">
+      <div class="card-icon" style="background:rgba(245,158,11,0.12)">🔗</div>
+      <div class="card-title">What is IPC?</div>
+      <div class="card-text">IPC (Inter-Process Communication) describes <strong style="color:var(--accent3)">any mechanism</strong> that lets separate OS processes exchange data and coordinate actions — without sharing the same memory space by default.</div>
+    </div>
+    <div class="card rd1">
+      <div class="card-icon" style="background:rgba(0,240,255,0.1)">🤝</div>
+      <div class="card-title">Why Do We Need It?</div>
+      <div class="card-text">Modern systems run many cooperating processes. A web browser fetches pages (network process) and renders them (UI process). IPC lets these <strong style="color:var(--accent)">separate processes work together</strong> safely.</div>
+    </div>
+    <div class="card rd2">
+      <div class="card-icon" style="background:rgba(139,92,246,0.1)">⚙️</div>
+      <div class="card-title">Multi-Tasking Context</div>
+      <div class="card-text">In multi-tasking operating systems, processes run <strong style="color:var(--accent2)">concurrently</strong>. IPC lets cooperating processes share information, synchronize, and split work efficiently across all cores.</div>
+    </div>
+    <div class="card rd3">
+      <div class="card-icon" style="background:rgba(16,217,140,0.1)">⚡</div>
+      <div class="card-title">Two Core Mechanisms</div>
+      <div class="card-text">Every IPC technique falls into one of two models: <strong style="color:var(--accent4)">Shared Memory</strong> (fast, low overhead) or <strong style="color:var(--accent4)">Message Passing</strong> (structured, OS-managed). We cover both in depth below.</div>
+    </div>
+  </div>
+
+  <!-- Independent vs Cooperating -->
+  <div class="viz-box reveal" style="margin-bottom:3rem">
+    <div class="viz-label">Independent Process vs Cooperating Process</div>
+    <div class="cmp-grid">
+      <div class="proc-box" style="border-color:rgba(255,71,87,0.3)">
+        <div class="proc-title"><div class="dot" style="background:var(--danger)"></div>Independent Process</div>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.7;margin-bottom:1rem">
+          An <strong style="color:var(--text)">independent process</strong> runs in total isolation. It cannot affect — or be affected by — any other process. It has its own private address space and does not share any data.
+        </p>
+        <div style="background:var(--bg);border:1px solid rgba(255,71,87,0.2);border-radius:8px;padding:0.9rem;font-size:0.78rem;color:var(--danger)">
+          ✗ No data sharing<br>✗ No coordination needed<br>✗ No IPC required<br>✓ Fully predictable & safe
+        </div>
+      </div>
+      <div class="proc-box" style="border-color:rgba(0,240,255,0.25)">
+        <div class="proc-title"><div class="dot" style="background:var(--accent)"></div>Cooperating Process</div>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.7;margin-bottom:1rem">
+          A <strong style="color:var(--text)">cooperating process</strong> can be affected by or can affect other running processes — including sharing data. These processes need IPC to exchange information safely.
+        </p>
+        <div style="background:var(--bg);border:1px solid rgba(0,240,255,0.15);border-radius:8px;padding:0.9rem;font-size:0.78rem;color:var(--accent4)">
+          ✓ Information sharing<br>✓ Modularity (split work)<br>✓ Computation speed-up<br>✓ Convenience
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Advantages -->
+  <div class="section-header reveal" style="margin-bottom:2rem;text-align:left">
+    <h3 style="font-size:1.4rem;margin:0">Advantages of Process Cooperation</h3>
+  </div>
+  <div class="grid-4 reveal" style="margin-bottom:3.5rem">
+    <div class="card" style="border-color:rgba(0,240,255,0.2)">
+      <div style="font-size:2rem;margin-bottom:0.7rem">📡</div>
+      <div class="card-title" style="color:var(--accent)">Information Sharing</div>
+      <div class="card-text">Multiple processes can access and work on the same data — e.g., multiple users editing a shared document — without duplicating data across each process's memory.</div>
+    </div>
+    <div class="card rd1" style="border-color:rgba(139,92,246,0.2)">
+      <div style="font-size:2rem;margin-bottom:0.7rem">🧩</div>
+      <div class="card-title" style="color:var(--accent2)">Modularity</div>
+      <div class="card-text">Break a large system into separate, well-defined processes. Each process handles one responsibility — like microservices — and communicates through clean IPC interfaces.</div>
+    </div>
+    <div class="card rd2" style="border-color:rgba(245,158,11,0.2)">
+      <div style="font-size:2rem;margin-bottom:0.7rem">🚀</div>
+      <div class="card-title" style="color:var(--accent3)">Computation Speed-up</div>
+      <div class="card-text">Split a big computation into sub-tasks that run in parallel on multiple cores. This is an extension of Modularity — cooperating sub-processes finish faster together than one alone.</div>
+    </div>
+    <div class="card rd3" style="border-color:rgba(16,217,140,0.2)">
+      <div style="font-size:2rem;margin-bottom:0.7rem">✨</div>
+      <div class="card-title" style="color:var(--accent4)">Convenience</div>
+      <div class="card-text">Users often do multiple things at once — editing a file, compiling, printing. Cooperating processes provide the OS infrastructure that makes this seamless multi-tasking possible.</div>
+    </div>
+  </div>
+
+  <!-- Communication Models Diagram -->
+  <div class="section-header reveal" style="text-align:left;margin-bottom:1.5rem">
+    <h3 style="font-size:1.4rem;margin:0">The Two IPC Communication Models</h3>
+    <p style="margin-top:0.5rem;color:var(--text2);font-size:0.9rem">Every IPC mechanism belongs to one of these two fundamental models.</p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-bottom:3rem" class="reveal ipc-models-grid">
+    <!-- Message Passing Diagram -->
+    <div class="viz-box" style="margin-bottom:0">
+      <div class="viz-label">Model (a) — Message Passing</div>
+      <svg viewBox="0 0 340 320" width="100%" style="display:block">
+        <defs>
+          <linearGradient id="gA" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00f0ff" stop-opacity="0.18"/><stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.1"/></linearGradient>
+          <linearGradient id="gKern" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e1e38"/><stop offset="100%" stop-color="#111122"/></linearGradient>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#00f0ff" opacity="0.7"/></marker>
+          <marker id="arr2" markerWidth="8" markerHeight="8" refX="2" refY="3" orient="auto"><path d="M8,0 L8,6 L0,3 z" fill="#00f0ff" opacity="0.7"/></marker>
+        </defs>
+        <!-- Kernel area -->
+        <rect x="30" y="160" width="280" height="130" rx="10" fill="url(#gKern)" stroke="#1e1e38" stroke-width="1"/>
+        <text x="170" y="180" text-anchor="middle" font-family="JetBrains Mono" font-size="10" fill="#3a3a5c" letter-spacing="2">KERNEL</text>
+        <!-- Message queue boxes -->
+        <rect x="55" y="195" width="36" height="24" rx="5" fill="#0d0d1a" stroke="#1e1e38"/>
+        <text x="73" y="211" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8888aa">m₀</text>
+        <rect x="95" y="195" width="36" height="24" rx="5" fill="#0d0d1a" stroke="#1e1e38"/>
+        <text x="113" y="211" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8888aa">m₁</text>
+        <rect x="135" y="195" width="36" height="24" rx="5" fill="#0d0d1a" stroke="#1e1e38"/>
+        <text x="153" y="211" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8888aa">m₂</text>
+        <rect x="175" y="195" width="36" height="24" rx="5" fill="#0d0d1a" stroke="#1e1e38"/>
+        <text x="193" y="211" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8888aa">m₃</text>
+        <text x="222" y="211" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3a3a5c">···</text>
+        <rect x="235" y="195" width="36" height="24" rx="5" fill="#0d0d1a" stroke="#1e1e38"/>
+        <text x="253" y="211" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8888aa">mₙ</text>
+        <!-- Queue label -->
+        <rect x="55" y="232" width="216" height="20" rx="5" fill="rgba(30,30,56,0.5)" stroke="#1e1e38"/>
+        <text x="163" y="246" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3a3a5c" letter-spacing="1">MESSAGE QUEUE</text>
+        <!-- Process A -->
+        <rect x="40" y="20" width="120" height="50" rx="10" fill="url(#gA)" stroke="rgba(0,240,255,0.3)"/>
+        <text x="100" y="42" text-anchor="middle" font-family="Outfit" font-size="12" font-weight="700" fill="#eeeef8">Process A</text>
+        <text x="100" y="58" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#00f0ff">sender</text>
+        <!-- Process B -->
+        <rect x="180" y="20" width="120" height="50" rx="10" fill="url(#gA)" stroke="rgba(139,92,246,0.3)"/>
+        <text x="240" y="42" text-anchor="middle" font-family="Outfit" font-size="12" font-weight="700" fill="#eeeef8">Process B</text>
+        <text x="240" y="58" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">receiver</text>
+        <!-- Arrows -->
+        <line x1="80" y1="70" x2="80" y2="193" stroke="#00f0ff" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.6" marker-end="url(#arr)"/>
+        <text x="54" y="135" font-family="JetBrains Mono" font-size="8" fill="#00f0ff">send(q,msg)</text>
+        <line x1="240" y1="193" x2="240" y2="72" stroke="#8b5cf6" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.6" marker-end="url(#arr)"/>
+        <text x="245" y="140" font-family="JetBrains Mono" font-size="8" fill="#8b5cf6">receive(p,msg)</text>
+        <!-- Kernel label bottom -->
+        <text x="170" y="280" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3a3a5c">OS manages the queue — kernel space</text>
+      </svg>
+      <p style="font-size:0.8rem;color:var(--text2);text-align:center;margin-top:0.5rem">Processes exchange <strong style="color:var(--accent)">discrete messages</strong> through a kernel-managed queue. Each send/receive is a system call.</p>
+    </div>
+
+    <!-- Shared Memory Diagram -->
+    <div class="viz-box" style="margin-bottom:0">
+      <div class="viz-label">Model (b) — Shared Memory</div>
+      <svg viewBox="0 0 340 320" width="100%" style="display:block">
+        <defs>
+          <linearGradient id="gSM" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25"/><stop offset="100%" stop-color="#10d98c" stop-opacity="0.15"/></linearGradient>
+          <marker id="arrSM" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#f59e0b" opacity="0.8"/></marker>
+          <marker id="arrSM2" markerWidth="8" markerHeight="8" refX="2" refY="3" orient="auto"><path d="M8,0 L8,6 L0,3 z" fill="#10d98c" opacity="0.8"/></marker>
+        </defs>
+        <!-- Kernel at bottom -->
+        <rect x="30" y="230" width="280" height="60" rx="10" fill="#111122" stroke="#1e1e38"/>
+        <text x="170" y="265" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#3a3a5c" letter-spacing="2">KERNEL</text>
+        <!-- Process A -->
+        <rect x="30" y="20" width="280" height="52" rx="10" fill="rgba(0,240,255,0.08)" stroke="rgba(0,240,255,0.25)"/>
+        <text x="170" y="42" text-anchor="middle" font-family="Outfit" font-size="13" font-weight="700" fill="#eeeef8">Process A</text>
+        <text x="170" y="60" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#00f0ff">user space</text>
+        <!-- Shared Memory Band -->
+        <rect x="30" y="88" width="280" height="44" rx="8" fill="url(#gSM)" stroke="rgba(245,158,11,0.5)" stroke-width="1.5"/>
+        <text x="170" y="106" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#f59e0b" letter-spacing="2">SHARED MEMORY REGION</text>
+        <text x="170" y="122" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#10d98c">controlled by user processes · not OS</text>
+        <!-- Process B -->
+        <rect x="30" y="148" width="280" height="52" rx="10" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.25)"/>
+        <text x="170" y="170" text-anchor="middle" font-family="Outfit" font-size="13" font-weight="700" fill="#eeeef8">Process B</text>
+        <text x="170" y="188" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">user space</text>
+        <!-- Arrows showing both access shared memory -->
+        <line x1="120" y1="72" x2="120" y2="87" stroke="#00f0ff" stroke-width="2" marker-end="url(#arrSM)"/>
+        <line x1="220" y1="87" x2="220" y2="72" stroke="#10d98c" stroke-width="2" marker-end="url(#arrSM2)"/>
+        <line x1="120" y1="133" x2="120" y2="148" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrSM)"/>
+        <line x1="220" y1="148" x2="220" y2="133" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrSM2)"/>
+        <!-- Note -->
+        <text x="170" y="302" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" fill="#3a3a5c">Both processes map the same physical pages</text>
+      </svg>
+      <p style="font-size:0.8rem;color:var(--text2);text-align:center;margin-top:0.5rem">Processes map the <strong style="color:var(--accent3)">same memory region</strong> into their address spaces. Communication is direct — no kernel calls per message.</p>
+    </div>
+  </div>
+
+  <!-- Producer-Consumer Problem -->
+  <div class="band" style="margin:0 -2rem 3rem;padding:3rem 2rem">
+    <div class="section-header reveal" style="text-align:left;margin-bottom:1.5rem">
+      <span class="section-tag">Classic IPC Problem</span>
+      <h3 style="font-size:1.5rem;margin:0.3rem 0">The Producer-Consumer Problem</h3>
+      <p style="color:var(--text2);font-size:0.9rem;margin-top:0.4rem">The paradigm for all cooperating-process data exchange — a producer creates items, a consumer uses them.</p>
+    </div>
+    <div class="grid-3 reveal">
+      <div class="card" style="border-color:rgba(0,240,255,0.2)">
+        <div style="font-size:1.8rem;margin-bottom:0.6rem">🏭</div>
+        <div class="card-title" style="color:var(--accent)">Producer</div>
+        <div class="card-text">Generates data items and places them into a shared buffer. Examples: a compiler producing assembly code, a web server producing HTTP responses, a keyboard driver producing keystrokes.</div>
+      </div>
+      <div class="card rd1" style="border-color:rgba(245,158,11,0.2)">
+        <div style="font-size:1.8rem;margin-bottom:0.6rem">📦</div>
+        <div class="card-title" style="color:var(--accent3)">The Buffer</div>
+        <div class="card-text">
+          <strong style="color:var(--text)">Unbounded buffer</strong> — no practical size limit. Producer never waits.<br><br>
+          <strong style="color:var(--text)">Bounded buffer</strong> — fixed size. Producer must wait if full; consumer must wait if empty.
+        </div>
+      </div>
+      <div class="card rd2" style="border-color:rgba(139,92,246,0.2)">
+        <div style="font-size:1.8rem;margin-bottom:0.6rem">🛒</div>
+        <div class="card-title" style="color:var(--accent2)">Consumer</div>
+        <div class="card-text">Takes items from the buffer and processes them. Examples: an assembler consuming compiler output, a printer consuming print jobs, a CPU consuming OS-scheduled threads.</div>
+      </div>
+    </div>
+    <!-- Interactive mini-simulation -->
+    <div class="viz-box reveal" style="margin-top:2rem;margin-bottom:0">
+      <div class="viz-label">Interactive — Bounded Buffer (size 6)</div>
+      <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;justify-content:center;margin-bottom:1.5rem">
+        <div style="text-align:center">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.4rem">Producer</div>
+          <div style="width:60px;height:60px;border-radius:50%;background:rgba(0,240,255,0.1);border:2px solid rgba(0,240,255,0.3);display:flex;align-items:center;justify-content:center;font-size:1.6rem" id="prodIcon">🏭</div>
+        </div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.6rem;text-align:center">Buffer (Shared Memory)</div>
+          <div style="display:flex;gap:4px;justify-content:center" id="bufferSlots">
+            <div class="buf-slot empty">_</div><div class="buf-slot empty">_</div><div class="buf-slot empty">_</div>
+            <div class="buf-slot empty">_</div><div class="buf-slot empty">_</div><div class="buf-slot empty">_</div>
+          </div>
+          <div style="text-align:center;margin-top:0.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text2)" id="bufStatus">Buffer: 0 / 6</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.4rem">Consumer</div>
+          <div style="width:60px;height:60px;border-radius:50%;background:rgba(139,92,246,0.1);border:2px solid rgba(139,92,246,0.3);display:flex;align-items:center;justify-content:center;font-size:1.6rem" id="consIcon">🛒</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap">
+        <button onclick="ipcProduce()" class="btn-primary" style="font-size:0.78rem;padding:0.55rem 1.2rem">+ Produce Item</button>
+        <button onclick="ipcConsume()" class="btn-secondary" style="font-size:0.78rem;padding:0.55rem 1.2rem">− Consume Item</button>
+        <button onclick="ipcReset()" style="font-size:0.78rem;padding:0.55rem 1.2rem;background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:10px;cursor:pointer">Reset</button>
+      </div>
+      <div id="ipcMsg" style="text-align:center;margin-top:0.9rem;font-size:0.82rem;color:var(--text2);min-height:1.4rem;font-family:'JetBrains Mono',monospace"></div>
+    </div>
+  </div>
+
+  <!-- Shared Memory Deep Dive -->
+  <div class="section-header reveal" style="text-align:left;margin-bottom:1.5rem">
+    <span class="section-tag" style="text-align:left;display:inline-block">Mechanism 1</span>
+    <h3 style="font-size:1.5rem;margin:0.3rem 0;color:var(--accent3)">Shared Memory — Deep Dive</h3>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:3rem" class="reveal ipc-models-grid">
+    <div>
+      <div class="highlight-box hb-info" style="margin-top:0">
+        <div class="hb-icon">💡</div>
+        <div class="hb-content">
+          <strong>Core Idea</strong>
+          An area of memory is created and <em>shared</em> among processes that wish to communicate. Once the shared segment is established, processes read and write directly — no kernel calls needed per access.
+        </div>
+      </div>
+      <div class="highlight-box" style="background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);margin-top:0.8rem">
+        <div class="hb-icon">⚠️</div>
+        <div class="hb-content">
+          <strong style="color:var(--accent3)">Major Challenge: Synchronization</strong>
+          <p style="font-size:0.83rem;margin:0.3rem 0 0">Since communication is under user-process control (not the OS), you must manually synchronize access. Without synchronization, two processes writing simultaneously = <strong>data corruption</strong>. Solutions: semaphores, mutexes, condition variables.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="background:var(--bg3)">
+      <div class="card-title" style="margin-bottom:1rem">Key Properties</div>
+      <table class="tbl" style="font-size:0.8rem">
+        <tr><td style="color:var(--text);font-weight:600;border-color:var(--border)">Speed</td><td style="color:var(--accent4);border-color:var(--border)">Very Fast — direct memory access</td></tr>
+        <tr><td style="color:var(--text);font-weight:600;border-color:var(--border)">Kernel calls</td><td style="color:var(--accent4);border-color:var(--border)">Only for setup (shmget, shmat)</td></tr>
+        <tr><td style="color:var(--text);font-weight:600;border-color:var(--border)">Sync needed?</td><td style="color:var(--danger);border-color:var(--border)">Yes — user must manage</td></tr>
+        <tr><td style="color:var(--text);font-weight:600;border-color:var(--border)">Best for</td><td style="color:var(--text2);border-color:var(--border)">Large data, high-frequency exchange</td></tr>
+        <tr><td style="color:var(--text);font-weight:600">POSIX API</td><td style="color:var(--text2)">shm_open, mmap, munmap</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Message Passing Deep Dive -->
+  <div class="section-header reveal" style="text-align:left;margin-bottom:1.5rem">
+    <span class="section-tag" style="text-align:left;display:inline-block">Mechanism 2</span>
+    <h3 style="font-size:1.5rem;margin:0.3rem 0;color:var(--accent)">Message Passing — Deep Dive</h3>
+  </div>
+  <div class="viz-box reveal" style="margin-bottom:2rem">
+    <div class="viz-label">Message Passing — Mailbox (Indirect) Model</div>
+    <svg viewBox="0 0 640 200" width="100%" style="display:block">
+      <defs>
+        <linearGradient id="mbGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e1e38"/><stop offset="100%" stop-color="#0d0d1a"/></linearGradient>
+        <marker id="mArr" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#00f0ff" opacity="0.75"/></marker>
+        <marker id="mArr2" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#8b5cf6" opacity="0.75"/></marker>
+      </defs>
+      <!-- P1 -->
+      <rect x="20" y="60" width="130" height="70" rx="10" fill="rgba(0,240,255,0.08)" stroke="rgba(0,240,255,0.3)"/>
+      <text x="85" y="88" text-anchor="middle" font-family="Outfit" font-size="13" font-weight="700" fill="#eeeef8">Process P1</text>
+      <text x="85" y="106" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#00f0ff">Sender</text>
+      <!-- Mailbox -->
+      <rect x="220" y="50" width="200" height="100" rx="12" fill="url(#mbGrad)" stroke="rgba(245,158,11,0.4)" stroke-width="1.5"/>
+      <text x="320" y="78" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="#f59e0b" letter-spacing="1">MAILBOX</text>
+      <text x="320" y="95" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#3a3a5c">Message Queue / Buffer</text>
+      <rect x="240" y="104" width="160" height="28" rx="6" fill="rgba(245,158,11,0.06)" stroke="rgba(245,158,11,0.15)"/>
+      <text x="320" y="122" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#3a3a5c">Kernel</text>
+      <!-- P2 -->
+      <rect x="490" y="60" width="130" height="70" rx="10" fill="rgba(139,92,246,0.08)" stroke="rgba(139,92,246,0.3)"/>
+      <text x="555" y="88" text-anchor="middle" font-family="Outfit" font-size="13" font-weight="700" fill="#eeeef8">Process P2</text>
+      <text x="555" y="106" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="#8b5cf6">Receiver</text>
+      <!-- Top arrow P1 to mailbox -->
+      <line x1="150" y1="75" x2="218" y2="85" stroke="#00f0ff" stroke-width="1.5" marker-end="url(#mArr)" opacity="0.75"/>
+      <text x="175" y="70" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#00f0ff">send(mailbox, msg)</text>
+      <!-- Bottom arrow mailbox to P2 -->
+      <line x1="420" y1="105" x2="489" y2="115" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#mArr2)" opacity="0.75"/>
+      <text x="462" y="136" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8b5cf6">receive(mailbox, msg)</text>
+      <!-- Animated message dot -->
+      <circle r="5" fill="#f59e0b" opacity="0.9">
+        <animateMotion dur="2.5s" repeatCount="indefinite" path="M 150,75 Q 320,60 420,105"/>
+        <animate attributeName="opacity" values="0;1;1;0" dur="2.5s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+  </div>
+
+  <!-- Operations -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:3rem" class="reveal ipc-models-grid">
+    <div class="card">
+      <div class="card-icon" style="background:rgba(0,240,255,0.1)">📤</div>
+      <div class="card-title">send(message)</div>
+      <div class="card-text">The sender process calls <code style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:0.85em">send()</code> to place a message into the communication channel. The message size can be <strong style="color:var(--text)">fixed</strong> (simpler implementation, harder for programmer) or <strong style="color:var(--text)">variable</strong> (complex implementation, easier for programmer).</div>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="background:rgba(139,92,246,0.1)">📥</div>
+      <div class="card-title">receive(message)</div>
+      <div class="card-text">The receiver calls <code style="color:var(--accent2);font-family:'JetBrains Mono',monospace;font-size:0.85em">receive()</code> to retrieve the next message. If no message is available, the behaviour depends on the <strong style="color:var(--text)">synchronization mode</strong>: blocking (wait) or non-blocking (return null).</div>
+    </div>
+  </div>
+
+  <!-- IPC Implementation Details -->
+  <div class="section-header reveal" style="text-align:left;margin-bottom:1.5rem">
+    <h3 style="font-size:1.4rem;margin:0">Implementation Issues — 3 Key Design Decisions</h3>
+  </div>
+
+  <!-- 1. Naming -->
+  <div class="viz-box reveal" style="margin-bottom:2rem">
+    <div class="viz-label">Decision 1 — Naming (How do processes find each other?)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem" class="ipc-models-grid">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:0.8rem">Direct Communication</div>
+        <p style="font-size:0.84rem;color:var(--text2);line-height:1.7;margin-bottom:0.7rem">
+          Processes name each other explicitly. A link is established automatically, exactly one link per pair, and each pair has exactly one link.
+        </p>
+        <div class="code-pre" style="margin-bottom:0">send(<span class="code-n">Q</span>, message)   <span class="code-cm">// send TO process Q</span>
+receive(<span class="code-n">P</span>, message) <span class="code-cm">// receive FROM process P</span></div>
+        <div style="margin-top:0.6rem;font-size:0.78rem;color:var(--text3)">⚠ Hard-coded IDs — hard to change if process name changes</div>
+      </div>
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent2);margin-bottom:0.8rem">Indirect Communication (Mailboxes)</div>
+        <p style="font-size:0.84rem;color:var(--text2);line-height:1.7;margin-bottom:0.7rem">
+          Processes communicate through a named <strong style="color:var(--text)">mailbox (port)</strong>. A link exists only if both share a mailbox, and a link can be shared by many processes.
+        </p>
+        <div class="code-pre" style="margin-bottom:0">send(<span class="code-n">A</span>, message)      <span class="code-cm">// send to mailbox A</span>
+receive(<span class="code-n">A</span>, message)   <span class="code-cm">// receive from mailbox A</span></div>
+        <div style="margin-top:0.6rem;font-size:0.78rem;color:var(--accent4)">✓ Flexible — multiple processes can share a mailbox</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Synchronization -->
+  <div class="viz-box reveal" style="margin-bottom:2rem">
+    <div class="viz-label">Decision 2 — Synchronization (Blocking vs Non-blocking)</div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:1rem" class="ipc-models-grid">
+      <div style="padding:1.2rem;background:var(--bg3);border-radius:10px;border:1px solid rgba(0,240,255,0.15)">
+        <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:0.5rem">🔒 Blocking (Synchronous)</div>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.65">
+          <strong style="color:var(--text)">Blocking send</strong>: Sender pauses until the message is received or placed in buffer.<br><br>
+          <strong style="color:var(--text)">Blocking receive</strong>: Receiver waits until a message is available. When both block, this is a <em style="color:var(--accent)">rendezvous</em> — perfect sync.
+        </p>
+      </div>
+      <div style="padding:1.2rem;background:var(--bg3);border-radius:10px;border:1px solid rgba(139,92,246,0.15)">
+        <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent2);margin-bottom:0.5rem">🔓 Non-blocking (Asynchronous)</div>
+        <p style="font-size:0.83rem;color:var(--text2);line-height:1.65">
+          <strong style="color:var(--text)">Non-blocking send</strong>: Sender fires the message and immediately continues execution.<br><br>
+          <strong style="color:var(--text)">Non-blocking receive</strong>: Returns immediately — either with a message or a null/empty signal. Receiver checks and moves on.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Buffering -->
+  <div class="viz-box reveal" style="margin-bottom:3rem">
+    <div class="viz-label">Decision 3 — Buffering (How many messages can queue up?)</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem" class="ipc-models-grid">
+      <div style="padding:1.2rem;background:var(--bg3);border-radius:10px;border-left:3px solid var(--danger)">
+        <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--danger);margin-bottom:0.5rem">Zero Capacity</div>
+        <div style="font-size:1.5rem;text-align:center;margin:0.5rem 0">🚫</div>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6">The queue holds <strong style="color:var(--text)">0 messages</strong>. The sender must block until the receiver is ready to accept. Also called <em>rendezvous</em>.</p>
+      </div>
+      <div style="padding:1.2rem;background:var(--bg3);border-radius:10px;border-left:3px solid var(--accent3)">
+        <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--accent3);margin-bottom:0.5rem">Finite Capacity</div>
+        <div style="font-size:1.5rem;text-align:center;margin:0.5rem 0">📦</div>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6">Queue holds <strong style="color:var(--text)">n messages</strong>. Sender can continue while there's space. When full, sender must block and wait for space.</p>
+      </div>
+      <div style="padding:1.2rem;background:var(--bg3);border-radius:10px;border-left:3px solid var(--accent4)">
+        <div style="font-size:0.72rem;font-family:'JetBrains Mono',monospace;text-transform:uppercase;color:var(--accent4);margin-bottom:0.5rem">Infinite Capacity</div>
+        <div style="font-size:1.5rem;text-align:center;margin:0.5rem 0">♾️</div>
+        <p style="font-size:0.82rem;color:var(--text2);line-height:1.6">Queue can grow without limit. The sender <strong style="color:var(--text)">never blocks</strong>. In practice this is theoretical — systems have finite RAM. Non-blocking send semantics.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Comparison Table -->
+  <div class="section-header reveal" style="text-align:left;margin-bottom:1.5rem">
+    <h3 style="font-size:1.4rem;margin:0">Shared Memory vs Message Passing — Comparison</h3>
+  </div>
+  <div class="reveal" style="margin-bottom:3rem">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th style="color:var(--accent3)">Shared Memory</th>
+          <th style="color:var(--accent)">Message Passing</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="td-feat">Speed</td><td class="td-yes">Very fast (direct RAM)</td><td style="color:var(--text2)">Slower (kernel syscalls)</td></tr>
+        <tr><td class="td-feat">Kernel involvement</td><td class="td-yes">Minimal (setup only)</td><td class="td-no">Every send/receive</td></tr>
+        <tr><td class="td-feat">Synchronization</td><td class="td-no">User must handle</td><td class="td-yes">Built-in</td></tr>
+        <tr><td class="td-feat">Data size</td><td class="td-yes">Any size efficiently</td><td style="color:var(--text2)">Better for small messages</td></tr>
+        <tr><td class="td-feat">Ease of use</td><td class="td-no">Complex (sync bugs)</td><td class="td-yes">Simpler interface</td></tr>
+        <tr><td class="td-feat">Distributed systems</td><td class="td-no">Not suitable</td><td class="td-yes">Works across networks</td></tr>
+        <tr><td class="td-feat">Real examples</td><td style="color:var(--accent3)">POSIX shm, mmap, GPU shared</td><td style="color:var(--accent)">Pipes, sockets, MPI, HTTP</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- IPC Mind Map -->
+  <div class="section-header reveal" style="text-align:center;margin-bottom:2rem">
+    <span class="section-tag">Visual Summary</span>
+    <h3 class="section-title" style="font-size:1.8rem">IPC Mind Map</h3>
+    <p class="section-sub">Every concept from this chapter, connected visually.</p>
+  </div>
+  <div class="viz-box reveal" style="padding:1rem;margin-bottom:3rem;overflow-x:auto">
+    <svg viewBox="0 0 900 540" width="100%" style="display:block;min-width:600px">
+      <defs>
+        <radialGradient id="mmCenter" cx="50%" cy="50%"><stop offset="0%" stop-color="#f59e0b" stop-opacity="0.4"/><stop offset="100%" stop-color="#f59e0b" stop-opacity="0.1"/></radialGradient>
+        <filter id="mmGlow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <!-- Central node -->
+      <ellipse cx="450" cy="270" rx="70" ry="38" fill="url(#mmCenter)" stroke="#f59e0b" stroke-width="2" filter="url(#mmGlow)"/>
+      <text x="450" y="265" text-anchor="middle" font-family="Outfit" font-size="13" font-weight="800" fill="#f59e0b">IPC</text>
+      <text x="450" y="280" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b" opacity="0.7">Inter-Process</text>
+      <text x="450" y="292" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b" opacity="0.7">Communication</text>
+
+      <!-- Branch: Shared Memory (left) -->
+      <line x1="382" y1="262" x2="245" y2="200" stroke="#10d98c" stroke-width="1.5" opacity="0.6"/>
+      <ellipse cx="200" cy="188" rx="60" ry="26" fill="rgba(16,217,140,0.1)" stroke="#10d98c" stroke-width="1.5"/>
+      <text x="200" y="185" text-anchor="middle" font-family="Outfit" font-size="11" font-weight="700" fill="#10d98c">Shared</text>
+      <text x="200" y="198" text-anchor="middle" font-family="Outfit" font-size="11" font-weight="700" fill="#10d98c">Memory</text>
+      <!-- SM sub-nodes -->
+      <line x1="148" y1="175" x2="85" y2="120" stroke="#10d98c" stroke-width="1" opacity="0.4"/>
+      <rect x="20" y="100" width="100" height="36" rx="8" fill="rgba(16,217,140,0.07)" stroke="rgba(16,217,140,0.25)"/>
+      <text x="70" y="117" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#10d98c">Fast — direct</text>
+      <text x="70" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#10d98c">RAM access</text>
+
+      <line x1="160" y1="210" x2="85" y2="248" stroke="#10d98c" stroke-width="1" opacity="0.4"/>
+      <rect x="20" y="232" width="100" height="36" rx="8" fill="rgba(16,217,140,0.07)" stroke="rgba(16,217,140,0.25)"/>
+      <text x="70" y="248" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#10d98c">Needs sync</text>
+      <text x="70" y="260" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#10d98c">(mutex/sem)</text>
+
+      <line x1="200" y1="214" x2="200" y2="280" stroke="#10d98c" stroke-width="1" opacity="0.4"/>
+      <rect x="145" y="280" width="110" height="28" rx="8" fill="rgba(16,217,140,0.07)" stroke="rgba(16,217,140,0.25)"/>
+      <text x="200" y="299" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#10d98c">shm_open / mmap</text>
+
+      <!-- Branch: Message Passing (right) -->
+      <line x1="518" y1="262" x2="655" y2="200" stroke="#00f0ff" stroke-width="1.5" opacity="0.6"/>
+      <ellipse cx="700" cy="188" rx="65" ry="26" fill="rgba(0,240,255,0.08)" stroke="#00f0ff" stroke-width="1.5"/>
+      <text x="700" y="185" text-anchor="middle" font-family="Outfit" font-size="11" font-weight="700" fill="#00f0ff">Message</text>
+      <text x="700" y="198" text-anchor="middle" font-family="Outfit" font-size="11" font-weight="700" fill="#00f0ff">Passing</text>
+      <!-- MP sub-nodes -->
+      <line x1="752" y1="175" x2="815" y2="120" stroke="#00f0ff" stroke-width="1" opacity="0.4"/>
+      <rect x="780" y="100" width="100" height="36" rx="8" fill="rgba(0,240,255,0.06)" stroke="rgba(0,240,255,0.2)"/>
+      <text x="830" y="117" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#00f0ff">send(msg)</text>
+      <text x="830" y="129" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#00f0ff">receive(msg)</text>
+
+      <line x1="742" y1="208" x2="815" y2="248" stroke="#00f0ff" stroke-width="1" opacity="0.4"/>
+      <rect x="778" y="232" width="100" height="36" rx="8" fill="rgba(0,240,255,0.06)" stroke="rgba(0,240,255,0.2)"/>
+      <text x="828" y="248" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#00f0ff">Pipes · Sockets</text>
+      <text x="828" y="260" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#00f0ff">MPI · HTTP</text>
+
+      <line x1="700" y1="214" x2="700" y2="280" stroke="#00f0ff" stroke-width="1" opacity="0.4"/>
+      <rect x="644" y="280" width="112" height="28" rx="8" fill="rgba(0,240,255,0.06)" stroke="rgba(0,240,255,0.2)"/>
+      <text x="700" y="299" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#00f0ff">Mailbox / Queue</text>
+
+      <!-- Branch: Naming (top-left) -->
+      <line x1="420" y1="234" x2="300" y2="100" stroke="#8b5cf6" stroke-width="1.5" opacity="0.5"/>
+      <ellipse cx="280" cy="80" rx="62" ry="24" fill="rgba(139,92,246,0.1)" stroke="#8b5cf6" stroke-width="1.5"/>
+      <text x="280" y="77" text-anchor="middle" font-family="Outfit" font-size="11" font-weight="700" fill="#8b5cf6">Naming</text>
+      <text x="280" y="90" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#8b5cf6">Direct · Indirect</text>
+
+      <!-- Branch: Synchronization (top-right) -->
+      <line x1="480" y1="234" x2="600" y2="100" stroke="#ff4757" stroke-width="1.5" opacity="0.5"/>
+      <ellipse cx="622" cy="80" rx="68" ry="24" fill="rgba(255,71,87,0.08)" stroke="#ff4757" stroke-width="1.5"/>
+      <text x="622" y="77" text-anchor="middle" font-family="Outfit" font-size="11" font-weight="700" fill="#ff4757">Synchronization</text>
+      <text x="622" y="90" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#ff4757">Block · Non-block</text>
+
+      <!-- Branch: Buffering (bottom) -->
+      <line x1="450" y1="308" x2="450" y2="430" stroke="#f59e0b" stroke-width="1.5" opacity="0.5"/>
+      <ellipse cx="450" cy="454" rx="65" ry="24" fill="rgba(245,158,11,0.1)" stroke="#f59e0b" stroke-width="1.5"/>
+      <text x="450" y="451" text-anchor="middle" font-family="Outfit" font-size="11" font-weight="700" fill="#f59e0b">Buffering</text>
+      <text x="450" y="464" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b">0 · Finite · Infinite</text>
+
+      <!-- Branch: Producer-Consumer (bottom-left) -->
+      <line x1="405" y1="300" x2="290" y2="420" stroke="#f59e0b" stroke-width="1.2" opacity="0.4"/>
+      <rect x="195" y="410" width="130" height="36" rx="8" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.25)"/>
+      <text x="260" y="427" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b">Producer-Consumer</text>
+      <text x="260" y="439" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b">Problem</text>
+
+      <!-- Branch: Cooperating Processes (bottom-right) -->
+      <line x1="495" y1="300" x2="610" y2="420" stroke="#f59e0b" stroke-width="1.2" opacity="0.4"/>
+      <rect x="568" y="410" width="130" height="36" rx="8" fill="rgba(245,158,11,0.07)" stroke="rgba(245,158,11,0.25)"/>
+      <text x="633" y="427" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b">Cooperating</text>
+      <text x="633" y="439" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#f59e0b">Processes</text>
+
+      <!-- Legend -->
+      <text x="450" y="528" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#3a3a5c">IPC Mind Map — zoom in on mobile for details</text>
+    </svg>
+  </div>
+
+  <!-- Quick Reference Cards -->
+  <div class="section-header reveal" style="text-align:left;margin-bottom:1.5rem">
+    <h3 style="font-size:1.4rem;margin:0">Quick Reference — IPC at a Glance</h3>
+  </div>
+  <div class="grid-3 reveal" style="margin-bottom:1rem">
+    <div class="card" style="background:rgba(0,240,255,0.04);border-color:rgba(0,240,255,0.15)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent);margin-bottom:0.8rem">Naming</div>
+      <div style="font-size:0.84rem;color:var(--text2);line-height:1.75">
+        <strong style="color:var(--text)">Direct</strong> — name the partner process<br>
+        <code style="color:var(--accent);font-size:0.8em">send(Q, msg) / receive(P, msg)</code><br><br>
+        <strong style="color:var(--text)">Indirect</strong> — use a mailbox/port<br>
+        <code style="color:var(--accent);font-size:0.8em">send(mailbox_A, msg)</code><br>
+        Multiple processes can share one mailbox
+      </div>
+    </div>
+    <div class="card" style="background:rgba(255,71,87,0.04);border-color:rgba(255,71,87,0.15)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--danger);margin-bottom:0.8rem">Synchronization</div>
+      <div style="font-size:0.84rem;color:var(--text2);line-height:1.75">
+        <strong style="color:var(--text)">Blocked Sender</strong> — waits for receiver<br>
+        <strong style="color:var(--text)">Blocked Receiver</strong> — waits for message<br><br>
+        <strong style="color:var(--text)">Non-blocking Sender</strong> — fire & continue<br>
+        <strong style="color:var(--text)">Non-blocking Receiver</strong> — poll & continue<br><br>
+        Both blocking = <em style="color:var(--accent)">rendezvous</em>
+      </div>
+    </div>
+    <div class="card" style="background:rgba(245,158,11,0.04);border-color:rgba(245,158,11,0.15)">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent3);margin-bottom:0.8rem">Buffering</div>
+      <div style="font-size:0.84rem;color:var(--text2);line-height:1.75">
+        <strong style="color:var(--danger)">0 capacity</strong> — no buffer; rendezvous required<br><br>
+        <strong style="color:var(--accent3)">Finite capacity</strong> — bounded queue of n items; sender blocks only when full<br><br>
+        <strong style="color:var(--accent4)">Infinite capacity</strong> — sender never blocks; theoretical
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page-wrap -->
+</section>
+
 <!-- ============================================================ FOOTER -->
 <footer>
   <div class="footer-logo">Thread<span>OS</span></div>
@@ -1755,12 +2309,67 @@ print(results)  <span class="code-cm"># [0,1,4,9,16,25,36,49,64,81]</span></div>
 
 <!-- ============================================================ JAVASCRIPT -->
 <script>
+  // ============================================================ SINGLE PAGE ROUTING
+// 1. Define all our "pages" (sections)
+const pages = [
+  document.getElementById('home'),
+  document.getElementById('concepts'),
+  document.getElementById('sync'),
+  document.getElementById('models').closest('.band'), // The models section is wrapped in a .band div
+  document.getElementById('mindmap'),
+  document.getElementById('simulator'),
+  document.getElementById('quiz'),
+  document.getElementById('challenges'),
+  document.getElementById('ipc')
+];
+
+// 2. Function to switch pages
+function navigateTo(targetId) {
+  // Hide all pages
+  pages.forEach(page => {
+    if (page) page.style.display = 'none';
+  });
+
+  // Show the requested page
+  const targetPage = targetId === 'models' ? document.getElementById('models').closest('.band') : document.getElementById(targetId);
+  if (targetPage) {
+    // The home section uses flexbox for centering, everything else uses standard block display
+    targetPage.style.display = targetId === 'home' ? 'flex' : 'block';
+  }
+
+  // Update the active state on the navigation bar
+  document.querySelectorAll('.nav-links a').forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + targetId);
+  });
+
+  // Jump to the top of the page instantly
+  window.scrollTo(0, 0);
+
+  // Trigger the reveal animations for the newly opened page
+  setTimeout(() => {
+    const reveals = targetPage.querySelectorAll('.reveal');
+    reveals.forEach(r => r.classList.add('in'));
+  }, 50);
+}
+
+// 3. Attach this logic to EVERY link on the site
+const allLinks = document.querySelectorAll('a[href^="#"]');
+allLinks.forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault(); // Stop standard scrolling behavior
+    const targetId = link.getAttribute('href').substring(1);
+    navigateTo(targetId);
+  });
+});
+
+// 4. Initialize: When the site loads, show ONLY the Home page
+navigateTo('home');
 // ============================================================ SCROLL PROGRESS & NAV
 window.addEventListener('scroll', () => {
   const pct = (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100;
   document.getElementById('navProgress').style.width = pct + '%';
   // Active nav link
-  const ids = ['home','concepts','sync','models','mindmap','simulator','quiz','challenges'];
+  const ids = ['home','concepts','sync','models','mindmap','simulator','quiz','challenges','ipc'];
   let cur = 'home';
   ids.forEach(id => {
     const el = document.getElementById(id);
